@@ -69,6 +69,31 @@ public:
    */
   Eigen::Vector3f traceRay(Eigen::Vector3f &origin, Eigen::Vector3f &dest);
 
+  /**
+   * @brief check if the ray intersects with a particular plane and give corresponding ray scalar (stored in paramater t)
+   * @param t ray scalar
+   * @param p0 center of plane
+   * @param n plane normal
+   * @param origin ray origin
+   * @param dest ray destination
+   * @return if ray intersects the plane; validity of t 
+   */
+  bool planeIntersect(float &t, const Eigen::Vector3f &p0, const Eigen::Vector3f &n, const Eigen::Vector3f &origin, const Eigen::Vector3f &dest);
+
+  /**
+   * @brief check if the ray intersects with a particular triangle and give corresponding ray scalar (stored in paramater t)
+   * @param t ray scalar
+   * @param v0 first vertex of the triangle
+   * @param v1 second vertex of the triangle
+   * @param v2 third vertex of the triangle
+   * @param origin ray origin
+   * @parma dest ray destination
+   * @return if ray intersects the triangle; validity of t
+   */
+  bool triangleIntersect(float &t, const Eigen::Vector3f &v0, const Eigen::Vector3f &v1, const Eigen::Vector3f &v2, const Eigen::Vector3f &origin, const Eigen::Vector3f &dest);
+
+  float traceDebugRay(Eigen::Vector3f &origin, Eigen::Vector3f &dest);
+
 private:
   // A simple phong shader for rendering meshes
   Tucano::Effects::PhongMaterial phong;

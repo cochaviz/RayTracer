@@ -1,5 +1,6 @@
 #include "flyscene.hpp"
 #include <GLFW/glfw3.h>
+#include <limits>
 
 void Flyscene::initialize(int width, int height) {
   // initiliaze the Phong Shading effect for the Opengl Previewer
@@ -11,7 +12,7 @@ void Flyscene::initialize(int width, int height) {
 
   // load the OBJ file and materials
   Tucano::MeshImporter::loadObjFile(mesh, materials,
-                                    "resources/models/dodgeColorTest.obj");
+                                    "resources/models/cube.obj");
 
 
   // normalize the model (scale to unit cube and center at origin)
@@ -20,9 +21,7 @@ void Flyscene::initialize(int width, int height) {
   // pass all the materials to the Phong Shader
   for (int i = 0; i < materials.size(); ++i)
     phong.addMaterial(materials[i]);
-
-
-
+  
   // set the color and size of the sphere to represent the light sources
   // same sphere is used for all sources
   lightrep.setColor(Eigen::Vector4f(1.0, 1.0, 0.0, 1.0));
@@ -35,26 +34,23 @@ void Flyscene::initialize(int width, int height) {
   camerarep.shapeMatrix()->scale(0.2);
 
   // the debug ray is a cylinder, set the radius and length of the cylinder
-  ray.setSize(0.005, 10.0);
+  // ray.setSize(0.005, 10.0);
 
   // craete a first debug ray pointing at the center of the screen
   createDebugRay(Eigen::Vector2f(width / 2.0, height / 2.0));
 
   glEnable(GL_DEPTH_TEST);
 
-  // for (int i = 0; i<mesh.getNumberOfFaces(); ++i){
-  //   Tucano::Face face = mesh.getFace(i);    
-  //   for (int j =0; j<face.vertex_ids.size(); ++j){
-  //     std::cout<<"vid "<<j<<" "<<face.vertex_ids[j]<<std::endl;
-  //     std::cout<<"vertex "<<mesh.getVertex(face.vertex_ids[j]).transpose()<<std::endl;
-  //     std::cout<<"normal "<<mesh.getNormal(face.vertex_ids[j]).transpose()<<std::endl;
-  //   }
-  //   std::cout<<"mat id "<<face.material_id<<std::endl<<std::endl;
-  //   std::cout<<"face   normal "<<face.normal.transpose() << std::endl << std::endl;
-  // }
-
-
-
+  for (int i = 0; i<mesh.getNumberOfFaces(); ++i){
+    Tucano::Face face = mesh.getFace(i);    
+    for (int j =0; j<face.vertex_ids.size(); ++j){
+      std::cout<<"vid "<<j<<" "<<face.vertex_ids[j]<<std::endl;
+      std::cout<<"vertex "<<mesh.getVertex(face.vertex_ids[j]).transpose()<<std::endl;
+      std::cout<<"normal "<<mesh.getNormal(face.vertex_ids[j]).transpose()<<std::endl;
+    }
+    std::cout<<"mat id "<<face.material_id<<std::endl<<std::endl;
+    std::cout<<"face   normal "<<face.normal.transpose() << std::endl << std::endl;
+  }
 }
 
 void Flyscene::paintGL(void) {
@@ -115,6 +111,13 @@ void Flyscene::createDebugRay(const Eigen::Vector2f &mouse_pos) {
 
   // direction from camera center to click position
   Eigen::Vector3f dir = (screen_pos - flycamera.getCenter()).normalized();
+
+  // set cylinder length to ray colission distance
+  float rayLength = traceDebugRay(screen_pos, dir);
+  ray.setSize(0.005, rayLength);
+
+  // set cylinder length to collision distance
+  traceRay(screen_pos, dir);
   
   // position and orient the cylinder representing the ray
   ray.setOriginOrientation(flycamera.getCenter(), dir);
@@ -151,18 +154,117 @@ void Flyscene::raytraceScene(int width, int height) {
       // launch raytracing for the given ray and write result to pixel data
       pixel_data[i][j] = traceRay(origin, screen_coords);
     }
-  }
-
+  } 
   // write the ray tracing result to a PPM image
   Tucano::ImageImporter::writePPMImage("result.ppm", pixel_data);
   std::cout << "ray tracing done! " << std::endl;
 }
 
+bool Flyscene::planeIntersect(float &t, const Eigen::Vector3f &p0, const Eigen::Vector3f &n, 
+                    const Eigen::Vector3f &origin, const Eigen::Vector3f &dest) { 
+  // Parallel test
+  float denominator = dest.dot(n); 
+  if (denominator < 1e-6) return false;
+   
+  // Compute ray intersection 
+  Eigen::Vector3f ray_direction = origin - p0;
+  t = ray_direction.dot(n);
+
+  // Check if ray is pointing backwards
+  return (t >= 0);
+}
+
+bool Flyscene::triangleIntersect(float &t, const Eigen::Vector3f &v0, const Eigen::Vector3f &v1, 
+                       const Eigen::Vector3f &v2, const Eigen::Vector3f &origin, const Eigen::Vector3f &dest) {
+  // Compute plane triangle normal
+  Eigen::Vector3f v0v1 = v1 - v0;
+  Eigen::Vector3f v0v2 = v2 - v0;
+  Eigen::Vector3f n = v0v1.cross(v0v2);
+  n.normalize();
+
+  // Parallel test
+  float denominator = n.dot(dest);
+  if (fabs(denominator) < 1e-6) return false;
+
+  // Compute plane intersection
+  float D = v0.dot(n);
+  t = -(n.dot(origin) + D) / denominator;  // TODO: negative or not?
+
+  // Check if ray is pointing backwards
+  if (t < 0) return false;
+
+  // Compute intersection point
+  Eigen::Vector3f p = origin + t * dest;
+
+  // Check if point is in triangle; check if point is left of every edge
+  // Edge 0
+  Eigen::Vector3f edge0 = v1 - v0;
+  Eigen::Vector3f v0p = p - v0;
+  Eigen::Vector3f C0 = edge0.cross(v0p);
+  if (n.dot(C0) < 0) return false;
+  
+  // Edge 1
+  Eigen::Vector3f edge1 = v2 - v1;
+  Eigen::Vector3f v1p = p - v1;
+  Eigen::Vector3f C1 = edge1.cross(v1p);
+  if (n.dot(C1) < 0) return false;
+
+  // Edge 2
+  Eigen::Vector3f edge2 = v0 - v2;
+  Eigen::Vector3f v2p = p - v2;
+  Eigen::Vector3f C2 = edge2.cross(v2p);
+  if (n.dot(C2) < 0) return false;
+  
+  return true;
+}
 
 Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
                                    Eigen::Vector3f &dest) {
-  // just some fake random color per pixel until you implement your ray tracing
-  // remember to return your RGB values as floats in the range [0, 1]!!!
-  return Eigen::Vector3f(rand() / (float)RAND_MAX, rand() / (float)RAND_MAX,
-                         rand() / (float)RAND_MAX);
+  // Normalize destination
+  dest.normalize();
+  
+  float t, tmin;
+  t = tmin = std::numeric_limits<float>::max();
+
+  // Loop over all the faces in the mesh
+  for (int i = 0; i<mesh.getNumberOfFaces(); ++i){
+    Tucano::Face face = mesh.getFace(i);    
+
+    Eigen::Vector3f v0 = mesh.getVertex(face.vertex_ids[0]).head<3>();
+    Eigen::Vector3f v1 = mesh.getVertex(face.vertex_ids[1]).head<3>();
+    Eigen::Vector3f v2 = mesh.getVertex(face.vertex_ids[2]).head<3>();
+
+    // If current intersection is closer to the camera, update tmin
+    if (triangleIntersect(t, v0, v1, v2, origin, dest))
+      tmin = (tmin > t) ? t : tmin;
+  }
+  // If tmin changed anywhere in the loop, it intersects with a face, and thus gets a color
+  // TODO shading
+  return (tmin != std::numeric_limits<float>::max()) ? Eigen::Vector3f(1.0, 1.0, 1.0) : Eigen::Vector3f(0.0, 0.0, 0.0);
 }
+
+float Flyscene::traceDebugRay(Eigen::Vector3f &origin,
+                                   Eigen::Vector3f &dest) {
+  // Normalize destination
+  dest.normalize();
+  
+  float t, tmin;
+  t = tmin = std::numeric_limits<float>::max();
+
+  // Loop over all the faces in the mesh
+  for (int i = 0; i<mesh.getNumberOfFaces(); ++i){
+    Tucano::Face face = mesh.getFace(i);    
+
+    Eigen::Vector3f v0 = mesh.getVertex(face.vertex_ids[0]).head<3>();
+    Eigen::Vector3f v1 = mesh.getVertex(face.vertex_ids[1]).head<3>();
+    Eigen::Vector3f v2 = mesh.getVertex(face.vertex_ids[2]).head<3>();
+
+    // If current intersection is closer to the camera, update tmin
+    if (triangleIntersect(t, v0, v1, v2, origin, dest))
+      tmin = (tmin > t) ? t : tmin;
+  }
+  // If tmin changed anywhere in the loop, it intersects with a face, and thus gets a color
+  // TODO shading
+  return (tmin != std::numeric_limits<float>::max()) ? tmin : 0;
+}
+
