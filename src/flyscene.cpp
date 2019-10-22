@@ -146,6 +146,8 @@ void Flyscene::raytraceScene(int width, int height) {
   Eigen::Vector3f origin = flycamera.getCenter();
   Eigen::Vector3f screen_coords;
 
+  std::cout << "hey: " << origin.transpose() << std::endl;
+
   // for every pixel shoot a ray from the origin through the pixel coords
   for (int j = 0; j < image_size[1]; ++j) {
     for (int i = 0; i < image_size[0]; ++i) {
@@ -177,18 +179,18 @@ bool Flyscene::planeIntersect(float &t, const Eigen::Vector3f &p0, const Eigen::
 bool Flyscene::triangleIntersect(float &t, const Eigen::Vector3f &v0, const Eigen::Vector3f &v1, 
                        const Eigen::Vector3f &v2, const Eigen::Vector3f &origin, const Eigen::Vector3f &dest) {
   // Compute plane triangle normal
-  Eigen::Vector3f v0v1 = v1 - v0;
-  Eigen::Vector3f v0v2 = v2 - v0;
-  Eigen::Vector3f n = v0v1.cross(v0v2);
-  n.normalize();
+  Eigen::Vector3f v0v2 = v0 - v2;
+  Eigen::Vector3f v1v2 = v1 - v2;
+  Eigen::Vector3f n = v0v2.cross(v1v2);
+  float area = n.norm();
 
   // Parallel test
   float denominator = n.dot(dest);
   if (fabs(denominator) < 1e-6) return false;
 
   // Compute plane intersection
-  float D = v0.dot(n);
-  t = -(n.dot(origin) + D) / denominator;  // TODO: negative or not?
+  float D = n.dot(v0);
+  t = (D - n.dot(origin)) / denominator;  // TODO: negative or not?
 
   // Check if ray is pointing backwards
   if (t < 0) return false;
@@ -198,22 +200,26 @@ bool Flyscene::triangleIntersect(float &t, const Eigen::Vector3f &v0, const Eige
 
   // Check if point is in triangle; check if point is left of every edge
   // Edge 0
-  Eigen::Vector3f edge0 = v1 - v0;
-  Eigen::Vector3f v0p = p - v0;
-  Eigen::Vector3f C0 = edge0.cross(v0p);
-  if (n.dot(C0) < 0) return false;
+  // Eigen::Vector3f edge0 = v1 - v0;
+  // Eigen::Vector3f v0p = p - v0;
+  // Eigen::Vector3f C0 = edge0.cross(v0p);
+  // if (n.dot(C0) < 0) return false;
   
   // Edge 1
   Eigen::Vector3f edge1 = v2 - v1;
   Eigen::Vector3f v1p = p - v1;
   Eigen::Vector3f C1 = edge1.cross(v1p);
-  if (n.dot(C1) < 0) return false;
+  float u = (C1.norm() / 2) / area;
+  if (u < 0) return false;
 
   // Edge 2
   Eigen::Vector3f edge2 = v0 - v2;
   Eigen::Vector3f v2p = p - v2;
   Eigen::Vector3f C2 = edge2.cross(v2p);
-  if (n.dot(C2) < 0) return false;
+  float v = (C2.norm() / 2) / area;
+  if (v < 0) return false;
+
+  if (u + v > 1) return false;
   
   return true;
 }
@@ -224,7 +230,7 @@ Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
   dest.normalize();
   
   float t, tmin;
-  t = tmin = std::numeric_limits<float>::max();
+  t = tmin = INFINITY;
 
   // Loop over all the faces in the mesh
   for (int i = 0; i<mesh.getNumberOfFaces(); ++i){
@@ -240,7 +246,7 @@ Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
   }
   // If tmin changed anywhere in the loop, it intersects with a face, and thus gets a color
   // TODO shading
-  return (tmin != std::numeric_limits<float>::max()) ? Eigen::Vector3f(1.0, 1.0, 1.0) : Eigen::Vector3f(0.0, 0.0, 0.0);
+  return (tmin != INFINITY) ? Eigen::Vector3f(1.0, 1.0, 1.0) : Eigen::Vector3f(0.0, 0.0, 0.0);
 }
 
 float Flyscene::traceDebugRay(Eigen::Vector3f &origin,
@@ -249,7 +255,7 @@ float Flyscene::traceDebugRay(Eigen::Vector3f &origin,
   dest.normalize();
   
   float t, tmin;
-  t = tmin = std::numeric_limits<float>::max();
+  t = tmin = INFINITY;
 
   // Loop over all the faces in the mesh
   for (int i = 0; i<mesh.getNumberOfFaces(); ++i){
@@ -265,6 +271,6 @@ float Flyscene::traceDebugRay(Eigen::Vector3f &origin,
   }
   // If tmin changed anywhere in the loop, it intersects with a face, and thus gets a color
   // TODO shading
-  return (tmin != std::numeric_limits<float>::max()) ? tmin : 0;
+  return (tmin != INFINITY) ? tmin : 0;
 }
 
