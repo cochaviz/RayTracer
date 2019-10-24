@@ -21,7 +21,7 @@ void Flyscene::initialize(int width, int height) {
   // pass all the materials to the Phong Shader
   for (int i = 0; i < materials.size(); ++i)
     phong.addMaterial(materials[i]);
-  
+
   // set the color and size of the sphere to represent the light sources
   // same sphere is used for all sources
   lightrep.setColor(Eigen::Vector4f(1.0, 1.0, 0.0, 1.0));
@@ -167,7 +167,6 @@ void Flyscene::createDebugRay(const Eigen::Vector2f &mouse_pos) {
 }
 
 void Flyscene::raytraceScene(int width, int height) {
-  std::cout << "ray tracing ..." << std::endl;
 
   // if no width or height passed, use dimensions of current viewport
   Eigen::Vector2i image_size(width, height);
@@ -198,93 +197,47 @@ void Flyscene::raytraceScene(int width, int height) {
   } 
   // write the ray tracing result to a PPM image
   Tucano::ImageImporter::writePPMImage("result.ppm", pixel_data);
-  std::cout << "ray tracing done! " << std::endl;
 }
 
-bool Flyscene::planeIntersect(float &t, const Eigen::Vector3f &p0, const Eigen::Vector3f &n, 
-                    const Eigen::Vector3f &origin, const Eigen::Vector3f &dest) { 
-  // Parallel test
-  float denominator = dest.dot(n); 
-  if (denominator < 1e-6) return false;
-   
-  // Compute ray intersection 
-  Eigen::Vector3f ray_direction = origin - p0;
-  t = ray_direction.dot(n);
+bool Flyscene::triangleIntersect(float &t, const Eigen::Vector3f origin, const Eigen::Vector3f dest, const Eigen::Vector3f v0, const Eigen::Vector3f v1, const Eigen::Vector3f v2) {
+  Eigen::Matrix<float, 3, 3> mat;
+  Eigen::Vector3f dir = (dest - origin).normalized();
+  Eigen::Vector3f rv0 = v0 - origin;
 
-  // Check if ray is pointing backwards
-  return (t >= 0);
-}
+  mat << v0[0] - v1[0], v0[0] - v2[0], dir[0]
+       , v0[1] - v1[1], v0[1] - v2[1], dir[1]
+       , v0[2] - v1[2], v0[2] - v2[2], dir[2];
 
-bool Flyscene::triangleIntersect(float &t, const Eigen::Vector3f &v0, const Eigen::Vector3f &v1, 
-                       const Eigen::Vector3f &v2, const Eigen::Vector3f &origin, const Eigen::Vector3f &dest) {
-  // Compute plane triangle normal
-  Eigen::Vector3f v0v2 = v0 - v2;
-  Eigen::Vector3f v1v2 = v1 - v2;
-  Eigen::Vector3f n = v0v2.cross(v1v2);
-  float area = n.norm();
+  Eigen::Vector3f solution = (mat.inverse() * rv0);
+  t = solution[2];
 
-  // Parallel test
-  float denominator = n.dot(dest);
-  if (fabs(denominator) < 1e-6) return false;
+  if(solution[0] < 0) return false;
+  if(solution[1] < 0) return false;
+  if(solution[0] + solution[1] - 1 > 0) return false;
 
-  // Compute plane intersection
-  float D = n.dot(v0);
-  t = (D - n.dot(origin)) / denominator;  // TODO: negative or not?
-
-  // Check if ray is pointing backwards
-  if (t < 0) return false;
-
-  // Compute intersection point
-  Eigen::Vector3f p = origin + t * dest;
-
-  // Check if point is in triangle; check if point is left of every edge
-  // Edge 0
-  // Eigen::Vector3f edge0 = v1 - v0;
-  // Eigen::Vector3f v0p = p - v0;
-  // Eigen::Vector3f C0 = edge0.cross(v0p);
-  // if (n.dot(C0) < 0) return false;
-  
-  // Edge 1
-  Eigen::Vector3f edge1 = v2 - v1;
-  Eigen::Vector3f v1p = p - v1;
-  Eigen::Vector3f C1 = edge1.cross(v1p);
-  float u = (C1.norm() / 2) / area;
-  if (u < 0) return false;
-
-  // Edge 2
-  Eigen::Vector3f edge2 = v0 - v2;
-  Eigen::Vector3f v2p = p - v2;
-  Eigen::Vector3f C2 = edge2.cross(v2p);
-  float v = (C2.norm() / 2) / area;
-  if (v < 0) return false;
-
-  if (u + v > 1) return false;
-  
   return true;
 }
 
 Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
                                    Eigen::Vector3f &dest) {
-  // Normalize destination
-  dest.normalize();
-  
+  Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
+
   float t, tmin;
   t = tmin = INFINITY;
-
-  // Loop over all the faces in the mesh
+   
   for (int i = 0; i<mesh.getNumberOfFaces(); ++i){
-    Tucano::Face face = mesh.getFace(i);    
+     Tucano::Face face = mesh.getFace(i);    
 
-    Eigen::Vector3f v0 = mesh.getVertex(face.vertex_ids[0]).head<3>();
-    Eigen::Vector3f v1 = mesh.getVertex(face.vertex_ids[1]).head<3>();
-    Eigen::Vector3f v2 = mesh.getVertex(face.vertex_ids[2]).head<3>();
+     Eigen::Vector3f v1 = (modelMatrix * mesh.getVertex(face.vertex_ids[0])).head<3>();
+     Eigen::Vector3f v2 = (modelMatrix * mesh.getVertex(face.vertex_ids[1])).head<3>();
+     Eigen::Vector3f v3 = (modelMatrix * mesh.getVertex(face.vertex_ids[2])).head<3>();
 
-    // If current intersection is closer to the camera, update tmin
-    if (triangleIntersect(t, v0, v1, v2, origin, dest))
-      tmin = (tmin > t) ? t : tmin;
+     if(triangleIntersect(t, origin, dest, v1, v2, v3))
+       tmin = (t < tmin) ? t : tmin;
+     
+    std::cout<<"mat id "<<face.material_id<<std::endl<<std::endl;
+    std::cout<<"face   normal "<<face.normal.transpose() << std::endl << std::endl;
   }
-  // If tmin changed anywhere in the loop, it intersects with a face, and thus gets a color
-  // TODO shading
   return (tmin != INFINITY) ? Eigen::Vector3f(1.0, 1.0, 1.0) : Eigen::Vector3f(0.0, 0.0, 0.0);
 }
 

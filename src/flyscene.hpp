@@ -94,6 +94,8 @@ public:
 
   float traceDebugRay(Eigen::Vector3f &origin, Eigen::Vector3f &dest);
 
+  bool triangleIntersect(float &t, const Eigen::Vector3f origin, const Eigen::Vector3f dest, const Eigen::Vector3f v0, const Eigen::Vector3f v1, const Eigen::Vector3f v2);
+  
 private:
   // A simple phong shader for rendering meshes
   Tucano::Effects::PhongMaterial phong;
