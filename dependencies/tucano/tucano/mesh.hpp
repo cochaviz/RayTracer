@@ -246,6 +246,13 @@ public:
     Face() {}
 };
 
+class BoundingBox
+{
+public:
+	Eigen::Vector3f min;
+	Eigen::Vector3f max;
+};
+
 /**
  * @brief A common Mesh, usually containing triagles or points.
  *

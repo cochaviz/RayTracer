@@ -41,6 +41,45 @@ void Flyscene::initialize(int width, int height) {
 
   glEnable(GL_DEPTH_TEST);
 
+
+  /**
+  * @brief Loop over all vertices and get the min and max vertex.
+  *
+  */
+  Eigen::Vector3f min = Eigen::Vector3f(INFINITY, INFINITY, INFINITY);
+  Eigen::Vector3f max = Eigen::Vector3f(-INFINITY, -INFINITY, -INFINITY);
+  for (int i = 0; i < mesh.getNumberOfVertices(); i++) {
+	  if (mesh.getVertex(i)[0] < min[0]) {
+		  std::cout << "OLD MIN: " << min[0] << "  ::  NEW MIN: " << mesh.getVertex(i)[0] << std::endl;
+		  min[0] = mesh.getVertex(i)[0];
+	  }
+	  else if (mesh.getVertex(i)[0] > max[0]) {
+		  std::cout << "OLD MAX: " << max[0] << "  ::  NEW MAX: " << mesh.getVertex(i)[0] << std::endl;
+		  max[0] = mesh.getVertex(i)[0];
+	  }
+
+	  if (mesh.getVertex(i)[1] < min[1]) {
+		  std::cout << "OLD MIN: " << min[1] << "  ::  NEW MIN: " << mesh.getVertex(i)[1] << std::endl;
+		  min[1] = mesh.getVertex(i)[1];
+	  }
+	  else if (mesh.getVertex(i)[1] > max[1]) {
+		  std::cout << "OLD MAX: " << max[1] << "  ::  NEW MAX: " << mesh.getVertex(i)[1] << std::endl;
+		  max[1] = mesh.getVertex(i)[1];
+	  }
+
+	  if (mesh.getVertex(i)[2] < min[2]) {
+		  std::cout << "OLD MIN: " << min[2] << "  ::  NEW MIN: " << mesh.getVertex(i)[2] << std::endl;
+		  min[2] = mesh.getVertex(i)[2];
+	  }
+	  else if (mesh.getVertex(i)[2] > max[2]) {
+		  std::cout << "OLD MAX: " << max[2] << "  ::  NEW MAX: " << mesh.getVertex(i)[2] << std::endl;
+		  max[2] = mesh.getVertex(i)[2];
+	  }
+  }
+  std::cout << "Min vector: " << min.transpose() << std::endl;
+  std::cout << "Max vector: " << max.transpose() << std::endl;
+
+
   for (int i = 0; i<mesh.getNumberOfFaces(); ++i){
     Tucano::Face face = mesh.getFace(i);    
     for (int j =0; j<face.vertex_ids.size(); ++j){
