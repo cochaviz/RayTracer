@@ -9,12 +9,12 @@ A fully functional ray tracer written in C++, using OpenGL and the Tucano Framew
 - Keep the cards in the 'Project' page up to date, and make sure you include your name in the cards that you're involved with. This way we can keep each other in check and know exactly what to ask to whom. 
 
 ### First implementation goals
-There have been some changes to our minimum implementation goals. The minimal requirements are now our way to a sufficient mark
-everything else in the firt implementation goals is extra!
+There have been some changes to our minimum implementation goals. The minimal requirements are now our way to a sufficient mark,
+everything else under the name 'first implementation goals' is extra!
 
 #### Minimal requirements
 - [x] Perform ray intersections with planes, triangles, and bounding boxes.
-- [ ] Computate shading at the first impact point (diffuse and specular).
+- [x] Computate shading at the first impact point (diffuse and specular).
 - [ ] Calculate hard shadows from a point light.
 - [ ] Implement a (simple) acceleration structure.
 - [ ] Show a scene created by the group, exported as a wavefront object (OBJ)and directly loaded into the application.
