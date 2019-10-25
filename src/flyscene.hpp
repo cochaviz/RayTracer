@@ -69,6 +69,16 @@ public:
    */
   Eigen::Vector3f traceRay(Eigen::Vector3f &origin, Eigen::Vector3f &dest);
 
+  /**
+   * @briefs Check if the current ray intersects the given triangle, and returns the length of the ray (stored in variable t)
+   * @param the length of the ray (valid if function returns true)
+   * @param origin Ray origin
+   * @param dest Other point on the ray, usually screen coordinates
+   * @param v0 first vector of the triangle
+   * @param v1 second vector of the triangle
+   * @param v2 third vector of the triangle
+   * @return boolean check; whether or not the ray intersects with the triangle; validity of t
+   */
   bool triangleIntersect(float &t, const Eigen::Vector3f origin, const Eigen::Vector3f dest, const Eigen::Vector3f v0, const Eigen::Vector3f v1, const Eigen::Vector3f v2);
   
 private:

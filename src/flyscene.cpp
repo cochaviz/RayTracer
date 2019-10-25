@@ -155,43 +155,53 @@ void Flyscene::raytraceScene(int width, int height) {
 }
 
 bool Flyscene::triangleIntersect(float &t, const Eigen::Vector3f origin, const Eigen::Vector3f dest, const Eigen::Vector3f v0, const Eigen::Vector3f v1, const Eigen::Vector3f v2) {
+  // Create matrices and the normalized direction
   Eigen::Matrix<float, 3, 3> mat;
   Eigen::Vector3f dir = (dest - origin).normalized();
   Eigen::Vector3f rv0 = v0 - origin;
 
+	// Calculate a, b, and t
   mat << v0[0] - v1[0], v0[0] - v2[0], dir[0]
        , v0[1] - v1[1], v0[1] - v2[1], dir[1]
        , v0[2] - v1[2], v0[2] - v2[2], dir[2];
 
-  Eigen::Vector3f solution = (mat.inverse() * rv0);
+  Eigen::Vector3f solution = (mat.inverse() * rv0); // a, b, and t are stored in first to last indeces of the 'solution' matrix respectively
   t = solution[2];
 
-  if(solution[0] < 0) return false;
-  if(solution[1] < 0) return false;
-  if(solution[0] + solution[1] - 1 > 0) return false;
+	// check if the point of intersection lies within the triangle
+  if(solution[0] < 0 || solution[1] < 0 || solution[0] + solution[1] - 1 > 0) return false;
+
+	// check if the ray is not pointing backwards
+	if(solution[2] < 0) return false;
 
   return true;
 }
 
 Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
                                    Eigen::Vector3f &dest) {
-  Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
-
   float t, tmin;
   t = tmin = INFINITY;
-   
-  for (int i = 0; i<mesh.getNumberOfFaces(); ++i){
+  
+	// Get modelMatrix for the given mesh
+  Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
+ 
+	// Loop over all the faces in the scene
+	for (int i = 0; i<mesh.getNumberOfFaces(); ++i){
      Tucano::Face face = mesh.getFace(i);    
 
+		 // Convert mesh coordinates to world coordinates
      Eigen::Vector3f v1 = (modelMatrix * mesh.getVertex(face.vertex_ids[0])).head<3>();
      Eigen::Vector3f v2 = (modelMatrix * mesh.getVertex(face.vertex_ids[1])).head<3>();
      Eigen::Vector3f v3 = (modelMatrix * mesh.getVertex(face.vertex_ids[2])).head<3>();
 
+		 // Update tmin if the ray has an intersection with the given face, and t is smaller than tmin
+		 // or: if we found a face closer the ray
      if(triangleIntersect(t, origin, dest, v1, v2, v3))
        tmin = (t < tmin) ? t : tmin;
      
     std::cout<<"mat id "<<face.material_id<<std::endl<<std::endl;
     std::cout<<"face   normal "<<face.normal.transpose() << std::endl << std::endl;
   }
+	// Return a white pixel if tmin updated, else return black
   return (tmin != INFINITY) ? Eigen::Vector3f(1.0, 1.0, 1.0) : Eigen::Vector3f(0.0, 0.0, 0.0);
 }
