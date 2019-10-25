@@ -80,6 +80,8 @@ public:
    * @return boolean check; whether or not the ray intersects with the triangle; validity of t
    */
   bool triangleIntersect(float &t, const Eigen::Vector3f origin, const Eigen::Vector3f dest, const Eigen::Vector3f v0, const Eigen::Vector3f v1, const Eigen::Vector3f v2);
+
+  Eigen::Vector3f pointShading(const Tucano::Material::Mtl material, const Eigen::Vector3f p, const Eigen::Vector3f n, const Eigen::Vector3f dir, const Eigen::Vector3f light_position);
   
 private:
   // A simple phong shader for rendering meshes
