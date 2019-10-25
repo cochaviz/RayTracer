@@ -11,7 +11,7 @@ void Flyscene::initialize(int width, int height) {
 
   // load the OBJ file and materials
   Tucano::MeshImporter::loadObjFile(mesh, materials,
-                                    "resources/models/dodgeColorTest.obj");
+                                    "resources/models/cube.obj");
 
 
   // normalize the model (scale to unit cube and center at origin)
@@ -20,8 +20,6 @@ void Flyscene::initialize(int width, int height) {
   // pass all the materials to the Phong Shader
   for (int i = 0; i < materials.size(); ++i)
     phong.addMaterial(materials[i]);
-
-
 
   // set the color and size of the sphere to represent the light sources
   // same sphere is used for all sources
@@ -125,7 +123,6 @@ void Flyscene::createDebugRay(const Eigen::Vector2f &mouse_pos) {
 }
 
 void Flyscene::raytraceScene(int width, int height) {
-  std::cout << "ray tracing ..." << std::endl;
 
   // if no width or height passed, use dimensions of current viewport
   Eigen::Vector2i image_size(width, height);
@@ -155,14 +152,56 @@ void Flyscene::raytraceScene(int width, int height) {
 
   // write the ray tracing result to a PPM image
   Tucano::ImageImporter::writePPMImage("result.ppm", pixel_data);
-  std::cout << "ray tracing done! " << std::endl;
 }
 
+bool Flyscene::triangleIntersect(float &t, const Eigen::Vector3f origin, const Eigen::Vector3f dest, const Eigen::Vector3f v0, const Eigen::Vector3f v1, const Eigen::Vector3f v2) {
+  // Create matrices and the normalized direction
+  Eigen::Matrix<float, 3, 3> mat;
+  Eigen::Vector3f dir = (dest - origin).normalized();
+  Eigen::Vector3f rv0 = v0 - origin;
+
+	// Calculate a, b, and t
+  mat << v0[0] - v1[0], v0[0] - v2[0], dir[0]
+       , v0[1] - v1[1], v0[1] - v2[1], dir[1]
+       , v0[2] - v1[2], v0[2] - v2[2], dir[2];
+
+  Eigen::Vector3f solution = (mat.inverse() * rv0); // a, b, and t are stored in first to last indeces of the 'solution' matrix respectively
+  t = solution[2];
+
+	// check if the point of intersection lies within the triangle
+  if(solution[0] < 0 || solution[1] < 0 || solution[0] + solution[1] - 1 > 0) return false;
+
+	// check if the ray is not pointing backwards
+	if(solution[2] < 0) return false;
+
+  return true;
+}
 
 Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
                                    Eigen::Vector3f &dest) {
-  // just some fake random color per pixel until you implement your ray tracing
-  // remember to return your RGB values as floats in the range [0, 1]!!!
-  return Eigen::Vector3f(rand() / (float)RAND_MAX, rand() / (float)RAND_MAX,
-                         rand() / (float)RAND_MAX);
+  float t, tmin;
+  t = tmin = INFINITY;
+  
+	// Get modelMatrix for the given mesh
+  Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
+ 
+	// Loop over all the faces in the scene
+	for (int i = 0; i<mesh.getNumberOfFaces(); ++i){
+     Tucano::Face face = mesh.getFace(i);    
+
+		 // Convert mesh coordinates to world coordinates
+     Eigen::Vector3f v1 = (modelMatrix * mesh.getVertex(face.vertex_ids[0])).head<3>();
+     Eigen::Vector3f v2 = (modelMatrix * mesh.getVertex(face.vertex_ids[1])).head<3>();
+     Eigen::Vector3f v3 = (modelMatrix * mesh.getVertex(face.vertex_ids[2])).head<3>();
+
+		 // Update tmin if the ray has an intersection with the given face, and t is smaller than tmin
+		 // or: if we found a face closer the ray
+     if(triangleIntersect(t, origin, dest, v1, v2, v3))
+       tmin = (t < tmin) ? t : tmin;
+     
+    std::cout<<"mat id "<<face.material_id<<std::endl<<std::endl;
+    std::cout<<"face   normal "<<face.normal.transpose() << std::endl << std::endl;
+  }
+	// Return a white pixel if tmin updated, else return black
+  return (tmin != INFINITY) ? Eigen::Vector3f(1.0, 1.0, 1.0) : Eigen::Vector3f(0.0, 0.0, 0.0);
 }
