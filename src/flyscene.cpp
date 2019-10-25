@@ -1,4 +1,5 @@
 #include "flyscene.hpp"
+#include <cmath>
 #include <GLFW/glfw3.h>
 
 void Flyscene::initialize(int width, int height) {
@@ -44,15 +45,10 @@ void Flyscene::initialize(int width, int height) {
   //   Tucano::Face face = mesh.getFace(i);    
   //   for (int j =0; j<face.vertex_ids.size(); ++j){
   //     std::cout<<"vid "<<j<<" "<<face.vertex_ids[j]<<std::endl;
-  //     std::cout<<"vertex "<<mesh.getVertex(face.vertex_ids[j]).transpose()<<std::endl;
-  //     std::cout<<"normal "<<mesh.getNormal(face.vertex_ids[j]).transpose()<<std::endl;
-  //   }
+  //     std::cout<<"vertex "<<mesh.getVertex(face.vertex_ids[j]).transpose()<<std::endl; std::cout<<"normal "<<mesh.getNormal(face.vertex_ids[j]).transpose()<<std::endl; }
   //   std::cout<<"mat id "<<face.material_id<<std::endl<<std::endl;
   //   std::cout<<"face   normal "<<face.normal.transpose() << std::endl << std::endl;
   // }
-
-
-
 }
 
 void Flyscene::paintGL(void) {
@@ -139,6 +135,9 @@ void Flyscene::raytraceScene(int width, int height) {
   // origin of the ray is always the camera center
   Eigen::Vector3f origin = flycamera.getCenter();
   Eigen::Vector3f screen_coords;
+	float progress = image_size[1];
+
+	std::cout << "Ray tracing scene..." << std::endl;
 
   // for every pixel shoot a ray from the origin through the pixel coords
   for (int j = 0; j < image_size[1]; ++j) {
@@ -147,17 +146,20 @@ void Flyscene::raytraceScene(int width, int height) {
       screen_coords = flycamera.screenToWorld(Eigen::Vector2f(i, j));
       // launch raytracing for the given ray and write result to pixel data
       pixel_data[i][j] = traceRay(origin, screen_coords);
+			// Kowalski... Status!
+			std::cout << "Progress: " << (j / progress) * 100 << "%" << std::endl;
     }
   }
+
+	std::cout << "Ray tracing done!" << std::endl;
 
   // write the ray tracing result to a PPM image
   Tucano::ImageImporter::writePPMImage("result.ppm", pixel_data);
 }
 
-bool Flyscene::triangleIntersect(float &t, const Eigen::Vector3f origin, const Eigen::Vector3f dest, const Eigen::Vector3f v0, const Eigen::Vector3f v1, const Eigen::Vector3f v2) {
+bool Flyscene::triangleIntersect(float &t, const Eigen::Vector3f origin, const Eigen::Vector3f dir, const Eigen::Vector3f v0, const Eigen::Vector3f v1, const Eigen::Vector3f v2) {
   // Create matrices and the normalized direction
   Eigen::Matrix<float, 3, 3> mat;
-  Eigen::Vector3f dir = (dest - origin).normalized();
   Eigen::Vector3f rv0 = v0 - origin;
 
 	// Calculate a, b, and t
@@ -177,17 +179,53 @@ bool Flyscene::triangleIntersect(float &t, const Eigen::Vector3f origin, const E
   return true;
 }
 
+Eigen::Vector3f Flyscene::pointShading(const Tucano::Material::Mtl material, const Eigen::Vector3f p, const Eigen::Vector3f n, const Eigen::Vector3f dir, const Eigen::Vector3f light_position) {
+	// Normalize normal
+	Eigen::Vector3f normal = n.normalized();
+
+	// Assume all lights have the same intesity, and color
+	Eigen::Vector3f light_value = Eigen::Vector3f(1.0, 1.0, 1.0);
+	
+	// Getting all the needed vectors read
+	Eigen::Vector3f light_dir = (light_position - p).normalized();
+	Eigen::Vector3f reflection = 2 * (light_dir.dot(normal)) * normal - light_dir;
+	Eigen::Vector3f eye_dir = -dir;
+
+	// Ambient term
+	Eigen::Vector3f ambient = light_value.cwiseProduct(material.getAmbient());
+
+	// Diffuse term
+	float costh = (light_dir).dot(normal);
+	Eigen::Vector3f diffuse = light_value.cwiseProduct(std::max(0.0f, costh) * material.getDiffuse());
+
+	// Specular term
+	float pre = reflection.dot(eye_dir);
+	float cosph = std::max(0.0f, pre);
+	float spec_term = std::pow(cosph, material.getShininess());
+	Eigen::Vector3f specular = light_value.cwiseProduct(spec_term * material.getSpecular());
+
+	// Add it all up
+	Eigen::Vector3f color = ambient + diffuse + specular;
+	return color;
+}
+
 Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
                                    Eigen::Vector3f &dest) {
   float t, tmin;
   t = tmin = INFINITY;
-  
+
+	// Face that's closest to the camera
+	Tucano::Face min_face;
+ 
+	// Compute ray direction
+  Eigen::Vector3f dir = (dest - origin).normalized();
+	
 	// Get modelMatrix for the given mesh
   Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
  
 	// Loop over all the faces in the scene
 	for (int i = 0; i<mesh.getNumberOfFaces(); ++i){
-     Tucano::Face face = mesh.getFace(i);    
+		Tucano::Face face = mesh.getFace(i);    
 
 		 // Convert mesh coordinates to world coordinates
      Eigen::Vector3f v1 = (modelMatrix * mesh.getVertex(face.vertex_ids[0])).head<3>();
@@ -196,12 +234,19 @@ Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
 
 		 // Update tmin if the ray has an intersection with the given face, and t is smaller than tmin
 		 // or: if we found a face closer the ray
-     if(triangleIntersect(t, origin, dest, v1, v2, v3))
-       tmin = (t < tmin) ? t : tmin;
-     
-    std::cout<<"mat id "<<face.material_id<<std::endl<<std::endl;
-    std::cout<<"face   normal "<<face.normal.transpose() << std::endl << std::endl;
+     if(triangleIntersect(t, origin, dir, v1, v2, v3) && t < tmin) {
+       	tmin = t;
+			 	min_face = face;
+			 } 
   }
-	// Return a white pixel if tmin updated, else return black
-  return (tmin != INFINITY) ? Eigen::Vector3f(1.0, 1.0, 1.0) : Eigen::Vector3f(0.0, 0.0, 0.0);
+	// Return the shaded pixel if tmin updated, else return a nice sky color
+	if (tmin != INFINITY) {
+		// Calculate point of intersection
+		// TODO Multiple light sources?
+		Eigen::Vector3f p = origin + tmin * dir;
+		return pointShading(materials[min_face.material_id], p, min_face.normal, dir, lights[0]);
+	} else {
+		// Show background color
+		return Eigen::Vector3f(85.0/255.0, 191.0/255.0, 225.0/255.0);
+	}
 }
