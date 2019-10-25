@@ -1,10 +1,12 @@
 #include "flyscene.hpp"
 #include <GLFW/glfw3.h>
 #include <limits>
+#include <tucano/shapes/box.hpp>
 
 void Flyscene::initialize(int width, int height) {
   // initiliaze the Phong Shading effect for the Opengl Previewer
   phong.initialize();
+
 
   // set the camera's projection matrix
   flycamera.setPerspectiveMatrix(60.0, width / (float)height, 0.1f, 100.0f);
@@ -17,6 +19,7 @@ void Flyscene::initialize(int width, int height) {
 
   // normalize the model (scale to unit cube and center at origin)
   mesh.normalizeModelMatrix();
+
 
   // pass all the materials to the Phong Shader
   for (int i = 0; i < materials.size(); ++i)
@@ -106,8 +109,12 @@ void Flyscene::paintGL(void) {
   scene_light.resetViewMatrix();
   scene_light.viewMatrix()->translate(-lights.back());
 
+  ////glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
   // render the scene using OpenGL and one light source
   phong.render(mesh, flycamera, scene_light);
+
+  drawCube();
 
   // render the ray and camera representation for ray debug
   ray.render(flycamera, scene_light);
@@ -152,8 +159,8 @@ void Flyscene::createDebugRay(const Eigen::Vector2f &mouse_pos) {
   Eigen::Vector3f dir = (screen_pos - flycamera.getCenter()).normalized();
 
   // set cylinder length to ray colission distance
-  float rayLength = traceDebugRay(screen_pos, dir);
-  ray.setSize(0.005, rayLength);
+  //float rayLength = traceDebugRay(screen_pos, dir);
+  //ray.setSize(0.005, rayLength);
 
   // set cylinder length to collision distance
   traceRay(screen_pos, dir);
@@ -241,28 +248,35 @@ Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
   return (tmin != INFINITY) ? Eigen::Vector3f(1.0, 1.0, 1.0) : Eigen::Vector3f(0.0, 0.0, 0.0);
 }
 
-float Flyscene::traceDebugRay(Eigen::Vector3f &origin,
-                                   Eigen::Vector3f &dest) {
-  // Normalize destination
-  dest.normalize();
-  
-  float t, tmin;
-  t = tmin = INFINITY;
+void Flyscene::drawCube() {
+	Eigen::Vector3f maxVector = mesh.getBoundingMax();
+	Eigen::Vector3f minVector = mesh.getBoundingMin();
 
-  // Loop over all the faces in the mesh
-  for (int i = 0; i<mesh.getNumberOfFaces(); ++i){
-    Tucano::Face face = mesh.getFace(i);    
+	float w = maxVector[0] - minVector[0];
+	float h = maxVector[1] - minVector[1];
+	float d = maxVector[2] - minVector[2];
+	Tucano::Shapes::Box bBox = Tucano::Shapes::Box(w, h, d);
+	bBox.setColor(Eigen::Vector4f(1, 0, 0, 1));
 
-    Eigen::Vector3f v0 = mesh.getVertex(face.vertex_ids[0]).head<3>();
-    Eigen::Vector3f v1 = mesh.getVertex(face.vertex_ids[1]).head<3>();
-    Eigen::Vector3f v2 = mesh.getVertex(face.vertex_ids[2]).head<3>();
+	Eigen::Affine3f mMatrix = bBox.getModelMatrix();
+	//mMatrix.translate(Eigen::Vector3f(1.0, 0, 0));
+	bBox.setModelMatrix(mMatrix);
+	bBox.resetShapeMatrix();
 
-    // If current intersection is closer to the camera, update tmin
-    if (triangleIntersect(t, v0, v1, v2, origin, dest))
-      tmin = (tmin > t) ? t : tmin;
-  }
-  // If tmin changed anywhere in the loop, it intersects with a face, and thus gets a color
-  // TODO shading
-  return (tmin != INFINITY) ? tmin : 0;
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	bBox.render(flycamera, scene_light);
+
+	//Temp
+	Tucano::Shapes::Box testBox = Tucano::Shapes::Box(1, 1, 1);
+	testBox.setColor(Eigen::Vector4f(1, 1, 0, 1));
+
+	mMatrix = testBox.getModelMatrix();
+	mMatrix.translate(Eigen::Vector3f(-1.0, 0, 0));
+	
+	testBox.setModelMatrix(mMatrix);
+	testBox.render(flycamera, scene_light);
+	// end temp
+
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
 }
-

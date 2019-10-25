@@ -270,6 +270,10 @@ public:
 		TRIANGLE,
 		PATCH
 	};
+
+
+	Eigen::Vector3f boundingMin;
+	Eigen::Vector3f boundingMax;
 	
 
 protected:
@@ -492,6 +496,22 @@ public:
         return numberOfVertices;
     }
 
+	/**
+	 * @brief Returns the minimal coordinates of the bounding box.
+	 * @return Vector with min coordinates.
+	 */
+	Eigen::Vector3f getBoundingMin() {
+		return boundingMin;
+	}
+
+	/**
+	 * @brief Returns the maximal coordinates of the bounding box.
+	 * @return Vector with max coordinates.
+	 */
+	Eigen::Vector3f getBoundingMax() {
+		return boundingMax;
+	}
+
     /**
      * @brief Resets all vertex attributes locations to -1.
      */
@@ -625,12 +645,19 @@ public:
             temp++;
         }
 
+
         normalization_scale = 1.0/max(max(xMax-xMin, yMax-yMin), zMax-zMin);
 
         float centerX = (xMax+xMin)/2.0;
         float centerY = (yMax+yMin)/2.0;
         float centerZ = (zMax+zMin)/2.0;
         objectCenter = Eigen::Vector3f(centerX, centerY, centerZ);
+
+
+		//  CUSTOM
+		boundingMin = Eigen::Vector3f(xMin, yMin, zMin);
+		boundingMin = Eigen::Vector3f(xMax, yMax, zMax);
+		// /CUSTOM
 
         // compute the centroid (different from the box center)
         centroid = Eigen::Vector3f::Zero();
