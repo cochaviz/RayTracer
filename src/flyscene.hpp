@@ -83,6 +83,17 @@ public:
 
   Eigen::Vector3f pointShading(const Tucano::Material::Mtl material, const Eigen::Vector3f p, const Eigen::Vector3f n, const Eigen::Vector3f dir, const Eigen::Vector3f light_position);
   
+  /**
+	* @brief Loops over all the faces and check whether the ray from the intersection point of the closest face(p) to the light source(dest) intersects any of them.
+	*			If so color it black, otherwise use pointShading.
+	* @param t the length of the ray (valid if function returns true)
+	* @param p Ray origin - the closest intersection point from traceRay
+	* @param dest The location of the light source
+	* @param face The face containg the point of intersection p
+	* @return whether a point is in shadow
+	*/
+  bool isInShadow(float& t, const Eigen::Vector3f p, const Eigen::Vector3f dest, const Tucano::Face face);
+
 private:
   // A simple phong shader for rendering meshes
   Tucano::Effects::PhongMaterial phong;
