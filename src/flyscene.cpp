@@ -247,7 +247,9 @@ Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
 		// for the face that will be displayed test whether it is in shadow and  if true color it black	
 		if (isInShadow(tmin, p, lights.back(), min_face)) return Eigen::Vector3f(0.0, 0.0, 0.0);
 		//otherewise use pointShading
-		else return pointShading(materials[min_face.material_id], p, min_face.normal, dir, lights[0]);
+		//changed lights[0] to lights.back()
+		//I think it should use the last added light source
+		else return pointShading(materials[min_face.material_id], p, min_face.normal, dir, lights.back());
 	} else {
 		// Show background color
 		return Eigen::Vector3f(85.0/255.0, 191.0/255.0, 225.0/255.0);
