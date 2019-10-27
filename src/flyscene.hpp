@@ -69,9 +69,15 @@ public:
 	 */
 	Eigen::Vector3f traceRay(Eigen::Vector3f& origin, Eigen::Vector3f& dest);
 
+
+	bool boundingIntersection(Eigen::Vector3f& origin, Eigen::Vector3f& dest);
+
 	bool triangleIntersect(float& t, const Eigen::Vector3f origin, const Eigen::Vector3f dest, const Eigen::Vector3f v0, const Eigen::Vector3f v1, const Eigen::Vector3f v2);
 
-	void drawCube();
+	void drawBoundingBox();
+
+	Eigen::Vector3f min;
+	Eigen::Vector3f max;
 
 private:
 	// A simple phong shader for rendering meshes

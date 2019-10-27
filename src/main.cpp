@@ -4,9 +4,11 @@
 #include <GLFW/glfw3.h>
 #include "flyscene.hpp"
 #include <iostream>
+#include <atomic>
+#include <ctime>
 
-#define WINDOW_WIDTH 200
-#define WINDOW_HEIGHT 200
+#define WINDOW_WIDTH 600
+#define WINDOW_HEIGHT 600
 
 Flyscene *flyscene;
 Eigen::Vector2f mouse_pos = Eigen::Vector2f::Zero();
@@ -64,8 +66,15 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action,
     flyscene->createDebugRay(mouse_pos);
   else if (key == GLFW_KEY_L && action == GLFW_PRESS)
     flyscene->addLight();
-  else if (key == GLFW_KEY_T && action == GLFW_PRESS)
-    flyscene->raytraceScene();
+  else if (key == GLFW_KEY_T && action == GLFW_PRESS) {
+	  std::cout << "Raytrace start. Time start. Engage.." << std::endl;
+	  clock_t timeStart = clock();
+	  flyscene->raytraceScene();
+	  clock_t timeEnd = clock();
+
+	  printf("Render time     : %04.2f (sec)\n", (float)(timeEnd - timeStart) / CLOCKS_PER_SEC);
+
+  }
 }
 
 static void mouseButtonCallback(GLFWwindow *window, int button, int action,

@@ -526,7 +526,7 @@ public:
         #ifdef TUCANODEBUG
         else
         {
-            std::cout << " Successfully linked : " << shaderName << std::endl << std::endl;
+            //std::cout << " Successfully linked : " << shaderName << std::endl << std::endl;
         }
         #endif
     }

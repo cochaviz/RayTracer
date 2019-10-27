@@ -49,8 +49,8 @@ void Flyscene::initialize(int width, int height) {
   * @brief Loop over all vertices and get the min and max vertex.
   *
   */
-  Eigen::Vector3f min = Eigen::Vector3f(INFINITY, INFINITY, INFINITY);
-  Eigen::Vector3f max = Eigen::Vector3f(-INFINITY, -INFINITY, -INFINITY);
+  min = Eigen::Vector3f(INFINITY, INFINITY, INFINITY);
+  max = Eigen::Vector3f(-INFINITY, -INFINITY, -INFINITY);
   for (int i = 0; i < mesh.getNumberOfVertices(); i++) {
 	  if (mesh.getVertex(i)[0] < min[0]) {
 		  std::cout << "OLD MIN: " << min[0] << "  ::  NEW MIN: " << mesh.getVertex(i)[0] << std::endl;
@@ -114,7 +114,7 @@ void Flyscene::paintGL(void) {
   // render the scene using OpenGL and one light source
   phong.render(mesh, flycamera, scene_light);
 
-  drawCube();
+  drawBoundingBox();
 
   // render the ray and camera representation for ray debug
   ray.render(flycamera, scene_light);
@@ -158,12 +158,13 @@ void Flyscene::createDebugRay(const Eigen::Vector2f &mouse_pos) {
   // direction from camera center to click position
   Eigen::Vector3f dir = (screen_pos - flycamera.getCenter()).normalized();
 
-  // set cylinder length to ray colission distance
-  //float rayLength = traceDebugRay(screen_pos, dir);
-  //ray.setSize(0.005, rayLength);
+  // set cylinder length to ray colission distance 
+  float rayLength = 10;
+  ray.setSize(0.005, rayLength); 
 
   // set cylinder length to collision distance
   traceRay(screen_pos, dir);
+  std::cout << "Intersection: " << boundingIntersection(screen_pos, dir) << std::endl;
   
   // position and orient the cylinder representing the ray
   ray.setOriginOrientation(flycamera.getCenter(), dir);
@@ -225,6 +226,97 @@ bool Flyscene::triangleIntersect(float &t, const Eigen::Vector3f origin, const E
   return true;
 }
 
+/*
+Ray can be described as U = Origin (O) + t*Dest (D)
+For each plane (x,y,z) check for which t the ray intersects its lower and upper bounds.
+	so U = target coordinate, for instance lower bound x = 2
+Then you get 2 = O + t*D
+Solve for t.
+
+The minimal t of the 2 per plane gives the one hit first.
+The max of the 3 min t's gives the plane that intersects the box.
+*/
+bool Flyscene::boundingIntersection (Eigen::Vector3f& origin,
+												Eigen::Vector3f& destination) {
+
+	Eigen::Vector3f dest = (destination - origin).normalized();
+	float tmin = 0;
+	float tylb = 0;
+	float tzlb = 0;
+	float tmax = 0;
+	float tyub = 0;
+	float tzub = 0;
+	//Calculate the t for intersecting the lower bound and upper bound planes of 3 dimensions
+	//txlb and txub are named tmin and max for efficiency later
+
+	//Set x plane upper and lower bounds
+	if (dest[0] > 0) {
+		tmin = (min[0] - origin[0]) / dest[0];
+		tmax = (max[0] - origin[0]) / dest[0];
+	}
+	else if (dest[0] == 0) {
+		//Handle edge case of dest = -0
+		/*Eigen::Vector3f invdest = dest.inverse();
+		tmin = (min[0] - origin[0]) / invdest[0];
+		tmax = (max[0] - origin[0]) / invdest[0];*/
+	}
+	else {
+		tmin = (max[0] - origin[0]) / dest[0];
+		tmax = (min[0] - origin[0]) / dest[0];
+	}
+
+	//Set y plane upper and lower bounds
+	if (dest[1] > 0) {
+		tylb = (min[1] - origin[1]) / dest[1];
+		tyub = (max[1] - origin[1]) / dest[1];
+	}
+	else if (dest[1] == 0) {
+		////Handle edge case of dest = -0
+		//Eigen::Vector3f invdest = dest.inverse();
+		//tmin = (min[1] - origin[1]) / invdest[1];
+		//tmax = (max[1] - origin[1]) / invdest[1];
+	}
+	else {
+		tylb = (max[1] - origin[1]) / dest[1];
+		tyub = (min[1] - origin[1]) / dest[1];
+	}
+
+	//If a lower bound t is greater than an upper bound t of another dimension we do not hit the box
+	if ((tmin > tyub) || (tylb > tmax)) return false;
+
+	//test for new highest lower bound and lowest higher bound
+	if (tylb > tmin) tmin = tylb;
+	if (tyub < tmax) tmax = tyub;
+
+
+	//Set z plane upper and lower bounds
+	if (dest[1] > 0) {
+		tzlb = (min[2] - origin[2]) / dest[2];
+		tzub = (max[2] - origin[2]) / dest[2];
+	}
+	else if (dest[2] == 0) {
+		////Handle edge case of dest = -0
+		//Eigen::Vector3f invdest = dest.inverse();
+		//tmin = (min[2] - origin[2]) / invdest[2];
+		//tmax = (max[2] - origin[2]) / invdest[2];
+	}
+	else {
+		tzlb = (max[2] - origin[2]) / dest[2];
+		tzub = (min[2] - origin[2]) / dest[2];
+	}
+
+	if ((tmin > tzub) || (tylb > tzub)) return false;
+
+	//once more for z test for new highest low and lowest high
+	if (tzlb > tmin) tmin = tzlb;
+	if (tzub < tmax) tmax = tzub;
+
+	std::cout << "Lower t: " << tmin << " : " << tylb << " : " << tzlb << std::endl;
+	std::cout << "Upper t: " << tmax << " : " << tyub << " : " << tzub << std::endl;
+
+	return true;
+}
+
 Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
                                    Eigen::Vector3f &dest) {
   Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
@@ -242,31 +334,41 @@ Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
      if(triangleIntersect(t, origin, dest, v1, v2, v3))
        tmin = (t < tmin) ? t : tmin;
      
-    std::cout<<"mat id "<<face.material_id<<std::endl<<std::endl;
-    std::cout<<"face   normal "<<face.normal.transpose() << std::endl << std::endl;
+    //std::cout<<"mat id "<<face.material_id<<std::endl<<std::endl;
+    //std::cout<<"face   normal "<<face.normal.transpose() << std::endl << std::endl;
   }
   return (tmin != INFINITY) ? Eigen::Vector3f(1.0, 1.0, 1.0) : Eigen::Vector3f(0.0, 0.0, 0.0);
 }
 
-void Flyscene::drawCube() {
+void Flyscene::drawBoundingBox() {
 	Eigen::Vector3f maxVector = mesh.getBoundingMax();
 	Eigen::Vector3f minVector = mesh.getBoundingMin();
 
-	float w = maxVector[0] - minVector[0];
-	float h = maxVector[1] - minVector[1];
-	float d = maxVector[2] - minVector[2];
+	float w = max[0] - min[0];
+	float h = max[1] - min[1];
+	float d = max[2] - min[2];
 	Tucano::Shapes::Box bBox = Tucano::Shapes::Box(w, h, d);
 	bBox.setColor(Eigen::Vector4f(1, 0, 0, 1));
 
 	Eigen::Affine3f mMatrix = bBox.getModelMatrix();
-	//mMatrix.translate(Eigen::Vector3f(1.0, 0, 0));
+	mMatrix.translate(Eigen::Vector3f(1.0, 0, 0));
 	bBox.setModelMatrix(mMatrix);
-	bBox.resetShapeMatrix();
+	bBox.normalizeModelMatrix();
+
+	Eigen::Affine3f sMatrix = mesh.getShapeModelMatrix();
+	sMatrix = sMatrix.linear();
+	sMatrix = sMatrix.inverse();
+	
+
+	bBox.setModelMatrix(sMatrix);
 
 	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	bBox.render(flycamera, scene_light);
+	bBox.normalizeModelMatrix();
 
 	//Temp
+	//std::cout << "Scalars: " << w << " : " << h << " : " << d << std::endl;
+
 	Tucano::Shapes::Box testBox = Tucano::Shapes::Box(1, 1, 1);
 	testBox.setColor(Eigen::Vector4f(1, 1, 0, 1));
 
