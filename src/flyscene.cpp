@@ -179,34 +179,41 @@ bool Flyscene::triangleIntersect(float &t, const Eigen::Vector3f origin, const E
   return true;
 }
 
-Eigen::Vector3f Flyscene::pointShading(const Tucano::Material::Mtl material, const Eigen::Vector3f p, const Eigen::Vector3f n, const Eigen::Vector3f dir, const Eigen::Vector3f light_position) {
-	// Normalize normal
-	Eigen::Vector3f normal = n.normalized();
+Eigen::Vector3f Flyscene::pointShading(float& t, const Tucano::Material::Mtl material, const Eigen::Vector3f p, Tucano::Face face, const Eigen::Vector3f dir, const Eigen::Vector3f light_position) {
+	//if it's in shadow color it black
+	if (isInShadow(t, p, light_position, face))  return Eigen::Vector3f(0.0, 0.0, 0.0);
 
-	// Assume all lights have the same intesity, and color
-	Eigen::Vector3f light_value = Eigen::Vector3f(1.0, 1.0, 1.0);
-	
-	// Getting all the needed vectors read
-	Eigen::Vector3f light_dir = (light_position - p).normalized();
-	Eigen::Vector3f reflection = 2 * (light_dir.dot(normal)) * normal - light_dir;
-	Eigen::Vector3f eye_dir = -dir;
+	else {
+		//Getting the normal from the face
+		Eigen::Vector3f n = face.normal;
+		// Normalize normal
+		Eigen::Vector3f normal = n.normalized();
 
-	// Ambient term
-	Eigen::Vector3f ambient = light_value.cwiseProduct(material.getAmbient());
+		// Assume all lights have the same intesity, and color
+		Eigen::Vector3f light_value = Eigen::Vector3f(1.0, 1.0, 1.0);
 
-	// Diffuse term
-	float costh = (light_dir).dot(normal);
-	Eigen::Vector3f diffuse = light_value.cwiseProduct(std::max(0.0f, costh) * material.getDiffuse());
+		// Getting all the needed vectors read
+		Eigen::Vector3f light_dir = (light_position - p).normalized();
+		Eigen::Vector3f reflection = 2 * (light_dir.dot(normal)) * normal - light_dir;
+		Eigen::Vector3f eye_dir = -dir;
 
-	// Specular term
-	float pre = reflection.dot(eye_dir);
-	float cosph = std::max(0.0f, pre);
-	float spec_term = std::pow(cosph, material.getShininess());
-	Eigen::Vector3f specular = light_value.cwiseProduct(spec_term * material.getSpecular());
+		// Ambient term
+		Eigen::Vector3f ambient = light_value.cwiseProduct(material.getAmbient());
 
-	// Add it all up
-	Eigen::Vector3f color = ambient + diffuse + specular;
-	return color;
+		// Diffuse term
+		float costh = (light_dir).dot(normal);
+		Eigen::Vector3f diffuse = light_value.cwiseProduct(std::max(0.0f, costh) * material.getDiffuse());
+
+		// Specular term
+		float pre = reflection.dot(eye_dir);
+		float cosph = std::max(0.0f, pre);
+		float spec_term = std::pow(cosph, material.getShininess());
+		Eigen::Vector3f specular = light_value.cwiseProduct(spec_term * material.getSpecular());
+
+		// Add it all up
+		Eigen::Vector3f color = ambient + diffuse + specular;
+		return color;
+	}
 }
 
 Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
@@ -244,12 +251,8 @@ Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
 		// Calculate point of intersection
 		// TODO Multiple light sources?
 		Eigen::Vector3f p = origin + tmin * dir;
-		// for the face that will be displayed test whether it is in shadow and  if true color it black	
-		if (isInShadow(tmin, p, lights.back(), min_face)) return Eigen::Vector3f(0.0, 0.0, 0.0);
-		//otherewise use pointShading
-		//changed lights[0] to lights.back()
-		//I think it should use the last added light source
-		else return pointShading(materials[min_face.material_id], p, min_face.normal, dir, lights.back());
+		return pointShading(tmin,materials[min_face.material_id], p, min_face, dir, lights.back());
+
 	} else {
 		// Show background color
 		return Eigen::Vector3f(85.0/255.0, 191.0/255.0, 225.0/255.0);
