@@ -33,63 +33,10 @@ void Flyscene::initialize(int width, int height) {
   // scale the camera representation (frustum) for the ray debug
   camerarep.shapeMatrix()->scale(0.2);
 
-  // the debug ray is a cylinder, set the radius and length of the cylinder
-  // ray.setSize(0.005, 10.0);
-
   // craete a first debug ray pointing at the center of the screen
   createDebugRay(Eigen::Vector2f(width / 2.0, height / 2.0));
 
   glEnable(GL_DEPTH_TEST);
-
-
-  /**
-  * @brief Loop over all vertices and get the min and max vertex.
-  *
-  */
-  min = Eigen::Vector3f(INFINITY, INFINITY, INFINITY);
-  max = Eigen::Vector3f(-INFINITY, -INFINITY, -INFINITY);
-  for (int i = 0; i < mesh.getNumberOfVertices(); i++) {
-	  if (mesh.getVertex(i)[0] < min[0]) {
-		  std::cout << "OLD MIN: " << min[0] << "  ::  NEW MIN: " << mesh.getVertex(i)[0] << std::endl;
-		  min[0] = mesh.getVertex(i)[0];
-	  }
-	  else if (mesh.getVertex(i)[0] > max[0]) {
-		  std::cout << "OLD MAX: " << max[0] << "  ::  NEW MAX: " << mesh.getVertex(i)[0] << std::endl;
-		  max[0] = mesh.getVertex(i)[0];
-	  }
-
-	  if (mesh.getVertex(i)[1] < min[1]) {
-		  std::cout << "OLD MIN: " << min[1] << "  ::  NEW MIN: " << mesh.getVertex(i)[1] << std::endl;
-		  min[1] = mesh.getVertex(i)[1];
-	  }
-	  else if (mesh.getVertex(i)[1] > max[1]) {
-		  std::cout << "OLD MAX: " << max[1] << "  ::  NEW MAX: " << mesh.getVertex(i)[1] << std::endl;
-		  max[1] = mesh.getVertex(i)[1];
-	  }
-
-	  if (mesh.getVertex(i)[2] < min[2]) {
-		  std::cout << "OLD MIN: " << min[2] << "  ::  NEW MIN: " << mesh.getVertex(i)[2] << std::endl;
-		  min[2] = mesh.getVertex(i)[2];
-	  }
-	  else if (mesh.getVertex(i)[2] > max[2]) {
-		  std::cout << "OLD MAX: " << max[2] << "  ::  NEW MAX: " << mesh.getVertex(i)[2] << std::endl;
-		  max[2] = mesh.getVertex(i)[2];
-	  }
-  }
-  std::cout << "Min vector: " << min.transpose() << std::endl;
-  std::cout << "Max vector: " << max.transpose() << std::endl;
-
-
-  for (int i = 0; i<mesh.getNumberOfFaces(); ++i){
-    Tucano::Face face = mesh.getFace(i);    
-    for (int j =0; j<face.vertex_ids.size(); ++j){
-      std::cout<<"vid "<<j<<" "<<face.vertex_ids[j]<<std::endl;
-      std::cout<<"vertex "<<mesh.getVertex(face.vertex_ids[j]).transpose()<<std::endl;
-      std::cout<<"normal "<<mesh.getNormal(face.vertex_ids[j]).transpose()<<std::endl;
-    }
-    std::cout<<"mat id "<<face.material_id<<std::endl<<std::endl;
-    std::cout<<"face   normal "<<face.normal.transpose() << std::endl << std::endl;
-  }
 }
 
 void Flyscene::paintGL(void) {
@@ -111,7 +58,7 @@ void Flyscene::paintGL(void) {
   // render the scene using OpenGL and one light source
   phong.render(mesh, flycamera, scene_light);
 
-  // generate bounding box
+  // generate bounding box (not rendered)
   generateBoundingBox();
 
   // render the ray and camera representation for ray debug
@@ -162,7 +109,6 @@ void Flyscene::createDebugRay(const Eigen::Vector2f &mouse_pos) {
 
   // set cylinder length to collision distance
   traceRay(screen_pos, dir);
-  std::cout << "Intersection: " << boundingIntersection(screen_pos, dir) << std::endl;
   
   // position and orient the cylinder representing the ray
   ray.setOriginOrientation(flycamera.getCenter(), dir);
@@ -240,9 +186,6 @@ Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin, Eigen::Vector3f &des
 
      if(triangleIntersect(t, origin, dest, v1, v2, v3))
        tmin = (t < tmin) ? t : tmin;
-     
-    //std::cout<<"mat id "<<face.material_id<<std::endl<<std::endl;
-    //std::cout<<"face   normal "<<face.normal.transpose() << std::endl << std::endl;
   }
   return (tmin != INFINITY) ? Eigen::Vector3f(1.0, 1.0, 1.0) : Eigen::Vector3f(0.0, 0.0, 0.0);
 }
@@ -258,11 +201,12 @@ void Flyscene::generateBoundingBox() {
 	Eigen::Vector4f minVector = modelMatrix * Eigen::Vector4f(minVector3[0], minVector3[1], minVector3[2], 1.0f);
 	Eigen::Vector4f maxVector = modelMatrix * Eigen::Vector4f(maxVector3[0], maxVector3[1], maxVector3[2], 1.0f);
 
-	// Initialize bounding box
+	// Initialize bounding box width, height, depth
 	float w = maxVector[0] - minVector[0];
 	float h = maxVector[1] - minVector[1];
 	float d = maxVector[2] - minVector[2];
+	
+	// Generate a box using the size parameters 
 	Tucano::Shapes::Box bBox = Tucano::Shapes::Box(w, h, d);
-	bBox.setColor(Eigen::Vector4f(1, 0, 0, 1));
 }
 
