@@ -38,7 +38,6 @@ void Flyscene::initialize(int width, int height) {
 
 	// craete a first debug ray pointing at the center of the screen
 	createDebugRay(Eigen::Vector2f(width / 2.0, height / 2.0));
-	std::cout << "test: " << lights.back();//delete
 	glEnable(GL_DEPTH_TEST);
 
 	// for (int i = 0; i<mesh.getNumberOfFaces(); ++i){
@@ -188,7 +187,7 @@ Eigen::Vector3f Flyscene::random_unit_vector() {
 
 Eigen::Vector3f Flyscene::pointShading(float& t, const Tucano::Material::Mtl material, const Eigen::Vector3f p, Tucano::Face face, const Eigen::Vector3f dir, const Eigen::Vector3f light_position) {
 	float total = 0.0;
-	float iterations = 20.0;
+	float iterations = 70.0;
 	float radius = lightrep.getBoundingSphereRadius();
 	for (int i = 0; i < iterations; i++) {
 		Eigen::Vector3f randme = random_unit_vector();
@@ -224,7 +223,7 @@ Eigen::Vector3f Flyscene::pointShading(float& t, const Tucano::Material::Mtl mat
 	Eigen::Vector3f specular = light_value.cwiseProduct(spec_term * material.getSpecular());
 
 	// Add it all up
-	Eigen::Vector3f color = coef * (ambient + diffuse + specular);
+	Eigen::Vector3f color = coef * (diffuse + specular);//ambient
 	return color;
 
 }
@@ -280,10 +279,12 @@ Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f& origin,
 
 
 bool Flyscene::isInShadow(float& t, const Eigen::Vector3f p, const Eigen::Vector3f dest, const Tucano::Face face) {
-
+	Eigen::Vector3f n = (face.normal).normalized();
 	Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
 	float m = INFINITY;
 	float bias = 0.05;
+
+	if (n.cross((dest - p).normalized()).norm() < 0) return true;
 
 	//loops over all the faces
 	for (int i = 0; i < mesh.getNumberOfFaces(); ++i) {
@@ -295,10 +296,9 @@ bool Flyscene::isInShadow(float& t, const Eigen::Vector3f p, const Eigen::Vector
 		Eigen::Vector3f v31 = (modelMatrix * mesh.getVertex(face1.vertex_ids[2])).head<3>();
 
 		// test whether the shadow ray intersects a triangle and whether it is closer
-		if (triangleIntersect(m, p + face.normal * bias, dest, v11, v21, v31) && t > m) {
+		if (triangleIntersect(m, p + n * bias, dest, v11, v21, v31) && t > m) {
 			return true;
 		}
-
 	}
 	return false;
 }
