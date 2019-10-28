@@ -80,7 +80,9 @@ public:
    * @return boolean check; whether or not the ray intersects with the triangle; validity of t
    */
   bool triangleIntersect(float &t, const Eigen::Vector3f origin, const Eigen::Vector3f dest, const Eigen::Vector3f v0, const Eigen::Vector3f v1, const Eigen::Vector3f v2);
-
+  
+  Eigen::Vector3f random_unit_vector();
+  
   Eigen::Vector3f pointShading(float& t, const Tucano::Material::Mtl material, const Eigen::Vector3f p, Tucano::Face face, const Eigen::Vector3f dir, const Eigen::Vector3f light_position);
   
   /**
