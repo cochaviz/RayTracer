@@ -1,6 +1,8 @@
 #include "flyscene.hpp"
 #include <cmath>
 #include <GLFW/glfw3.h>
+#include <limits>
+#include <tucano/shapes/box.hpp>
 
 void Flyscene::initialize(int width, int height) {
   // initiliaze the Phong Shading effect for the Opengl Previewer
@@ -13,7 +15,6 @@ void Flyscene::initialize(int width, int height) {
   // load the OBJ file and materials
   Tucano::MeshImporter::loadObjFile(mesh, materials,
                                     "resources/models/cube.obj");
-
 
   // normalize the model (scale to unit cube and center at origin)
   mesh.normalizeModelMatrix();
@@ -33,22 +34,10 @@ void Flyscene::initialize(int width, int height) {
   // scale the camera representation (frustum) for the ray debug
   camerarep.shapeMatrix()->scale(0.2);
 
-  // the debug ray is a cylinder, set the radius and length of the cylinder
-  ray.setSize(0.005, 10.0);
-
   // craete a first debug ray pointing at the center of the screen
   createDebugRay(Eigen::Vector2f(width / 2.0, height / 2.0));
 
   glEnable(GL_DEPTH_TEST);
-
-  // for (int i = 0; i<mesh.getNumberOfFaces(); ++i){
-  //   Tucano::Face face = mesh.getFace(i);    
-  //   for (int j =0; j<face.vertex_ids.size(); ++j){
-  //     std::cout<<"vid "<<j<<" "<<face.vertex_ids[j]<<std::endl;
-  //     std::cout<<"vertex "<<mesh.getVertex(face.vertex_ids[j]).transpose()<<std::endl; std::cout<<"normal "<<mesh.getNormal(face.vertex_ids[j]).transpose()<<std::endl; }
-  //   std::cout<<"mat id "<<face.material_id<<std::endl<<std::endl;
-  //   std::cout<<"face   normal "<<face.normal.transpose() << std::endl << std::endl;
-  // }
 }
 
 void Flyscene::paintGL(void) {
@@ -65,8 +54,13 @@ void Flyscene::paintGL(void) {
   scene_light.resetViewMatrix();
   scene_light.viewMatrix()->translate(-lights.back());
 
+  ////glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
   // render the scene using OpenGL and one light source
   phong.render(mesh, flycamera, scene_light);
+
+  // generate bounding box (not rendered)
+  generateBoundingBox();
 
   // render the ray and camera representation for ray debug
   ray.render(flycamera, scene_light);
@@ -109,6 +103,13 @@ void Flyscene::createDebugRay(const Eigen::Vector2f &mouse_pos) {
 
   // direction from camera center to click position
   Eigen::Vector3f dir = (screen_pos - flycamera.getCenter()).normalized();
+
+  // set cylinder length to ray colission distance 
+  float rayLength = 10;
+  ray.setSize(0.005, rayLength); 
+
+  // set cylinder length to collision distance
+  traceRay(screen_pos, dir);
   
   // position and orient the cylinder representing the ray
   ray.setOriginOrientation(flycamera.getCenter(), dir);
@@ -139,6 +140,8 @@ void Flyscene::raytraceScene(int width, int height) {
 
 	std::cout << "Ray tracing scene..." << std::endl;
 
+  std::cout << "hey: " << origin.transpose() << std::endl;
+
   // for every pixel shoot a ray from the origin through the pixel coords
   for (int j = 0; j < image_size[1]; ++j) {
     for (int i = 0; i < image_size[0]; ++i) {
@@ -149,10 +152,7 @@ void Flyscene::raytraceScene(int width, int height) {
 			// Kowalski... Status!
 			std::cout << "Progress: " << (j / progress) * 100 << "%" << std::endl;
     }
-  }
-
-	std::cout << "Ray tracing done!" << std::endl;
-
+  } 
   // write the ray tracing result to a PPM image
   Tucano::ImageImporter::writePPMImage("result.ppm", pixel_data);
 }
@@ -178,7 +178,6 @@ bool Flyscene::triangleIntersect(float &t, const Eigen::Vector3f origin, const E
 
   return true;
 }
-
 Eigen::Vector3f Flyscene::pointShading(const Tucano::Material::Mtl material, const Eigen::Vector3f p, const Eigen::Vector3f n, const Eigen::Vector3f dir, const Eigen::Vector3f light_position) {
 	// Normalize normal
 	Eigen::Vector3f normal = n.normalized();
@@ -250,3 +249,24 @@ Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
 		return Eigen::Vector3f(85.0/255.0, 191.0/255.0, 225.0/255.0);
 	}
 }
+
+void Flyscene::generateBoundingBox() {
+	// Get max values of the mesh
+	Eigen::Vector3f maxVector3 = mesh.getBoundingMax();
+	Eigen::Vector3f minVector3 = mesh.getBoundingMin();
+
+	Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
+
+	// Scale to mesh
+	Eigen::Vector4f minVector = modelMatrix * Eigen::Vector4f(minVector3[0], minVector3[1], minVector3[2], 1.0f);
+	Eigen::Vector4f maxVector = modelMatrix * Eigen::Vector4f(maxVector3[0], maxVector3[1], maxVector3[2], 1.0f);
+
+	// Initialize bounding box width, height, depth
+	float w = maxVector[0] - minVector[0];
+	float h = maxVector[1] - minVector[1];
+	float d = maxVector[2] - minVector[2];
+	
+	// Generate a box using the size parameters 
+	Tucano::Shapes::Box bBox = Tucano::Shapes::Box(w, h, d);
+}
+
