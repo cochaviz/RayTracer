@@ -72,7 +72,7 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action,
 	  flyscene->raytraceScene();
 	  clock_t timeEnd = clock();
 
-	  printf("\nRender time     : %04.2f (sec)\n", (float)(timeEnd - timeStart) / CLOCKS_PER_SEC);
+	  printf("\n Render time     : %04.2f (sec)\n", (float)(timeEnd - timeStart) / CLOCKS_PER_SEC);
 
   }
 }

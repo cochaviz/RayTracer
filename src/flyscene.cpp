@@ -138,19 +138,29 @@ void Flyscene::raytraceScene(int width, int height) {
   Eigen::Vector3f screen_coords;
 	float progress = image_size[1];
 
+	int barWidth = 45;
+
 	std::cout << "Ray tracing scene..." << std::endl;
 
   std::cout << "hey: " << origin.transpose() << std::endl;
 
   // for every pixel shoot a ray from the origin through the pixel coords
   for (int j = 0; j < image_size[1]; ++j) {
-    for (int i = 0; i < image_size[0]; ++i) {
-      // create a ray from the camera passing through the pixel (i,j)
-      screen_coords = flycamera.screenToWorld(Eigen::Vector2f(i, j));
-      // launch raytracing for the given ray and write result to pixel data
-      pixel_data[i][j] = traceRay(origin, screen_coords);
-			// Kowalski... Status!
-			std::cout << "Progress: " << (j / progress) * 100 << "%" << std::endl;
+	for (int i = 0; i < image_size[0]; ++i) {
+		// create a ray from the camera passing through the pixel (i,j)
+		screen_coords = flycamera.screenToWorld(Eigen::Vector2f(i, j));
+		// launch raytracing for the given ray and write result to pixel data
+		pixel_data[i][j] = traceRay(origin, screen_coords);
+
+		// Kowalski... Status!
+		std::cout << "[";
+		int pos = barWidth * (j / progress);
+		for (int i = 0; i < barWidth; ++i) {
+			if (i <= pos) std::cout << "#";
+			else std::cout << "-";
+		}
+		std::cout << "] " << int((j/ progress) * 100.0) << " %\r";
+		std::cout.flush();
     }
   } 
   // write the ray tracing result to a PPM image
