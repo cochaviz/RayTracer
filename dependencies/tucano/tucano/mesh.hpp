@@ -656,7 +656,7 @@ public:
 
 		//  CUSTOM
 		boundingMin = Eigen::Vector3f(xMin, yMin, zMin);
-		boundingMin = Eigen::Vector3f(xMax, yMax, zMax);
+		boundingMax = Eigen::Vector3f(xMax, yMax, zMax);
 		// /CUSTOM
 
         // compute the centroid (different from the box center)

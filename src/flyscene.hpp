@@ -74,6 +74,7 @@ public:
 
 	bool triangleIntersect(float& t, const Eigen::Vector3f origin, const Eigen::Vector3f dest, const Eigen::Vector3f v0, const Eigen::Vector3f v1, const Eigen::Vector3f v2);
 
+	void generateBoundingBox();
 	void drawBoundingBox();
 
 	Eigen::Vector3f min;

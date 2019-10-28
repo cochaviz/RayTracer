@@ -7,7 +7,6 @@ void Flyscene::initialize(int width, int height) {
   // initiliaze the Phong Shading effect for the Opengl Previewer
   phong.initialize();
 
-
   // set the camera's projection matrix
   flycamera.setPerspectiveMatrix(60.0, width / (float)height, 0.1f, 100.0f);
   flycamera.setViewport(Eigen::Vector2f((float)width, (float)height));
@@ -16,10 +15,8 @@ void Flyscene::initialize(int width, int height) {
   Tucano::MeshImporter::loadObjFile(mesh, materials,
                                     "resources/models/cube.obj");
 
-
   // normalize the model (scale to unit cube and center at origin)
   mesh.normalizeModelMatrix();
-
 
   // pass all the materials to the Phong Shader
   for (int i = 0; i < materials.size(); ++i)
@@ -114,7 +111,8 @@ void Flyscene::paintGL(void) {
   // render the scene using OpenGL and one light source
   phong.render(mesh, flycamera, scene_light);
 
-  drawBoundingBox();
+  // generate bounding box
+  generateBoundingBox();
 
   // render the ray and camera representation for ray debug
   ray.render(flycamera, scene_light);
@@ -226,99 +224,8 @@ bool Flyscene::triangleIntersect(float &t, const Eigen::Vector3f origin, const E
   return true;
 }
 
-/*
-Ray can be described as U = Origin (O) + t*Dest (D)
-For each plane (x,y,z) check for which t the ray intersects its lower and upper bounds.
-	so U = target coordinate, for instance lower bound x = 2
-Then you get 2 = O + t*D
-Solve for t.
-
-The minimal t of the 2 per plane gives the one hit first.
-The max of the 3 min t's gives the plane that intersects the box.
-*/
-bool Flyscene::boundingIntersection (Eigen::Vector3f& origin,
-												Eigen::Vector3f& destination) {
-
-	Eigen::Vector3f dest = (destination - origin).normalized();
-	float tmin = 0;
-	float tylb = 0;
-	float tzlb = 0;
-	float tmax = 0;
-	float tyub = 0;
-	float tzub = 0;
-	//Calculate the t for intersecting the lower bound and upper bound planes of 3 dimensions
-	//txlb and txub are named tmin and max for efficiency later
-
-	//Set x plane upper and lower bounds
-	if (dest[0] > 0) {
-		tmin = (min[0] - origin[0]) / dest[0];
-		tmax = (max[0] - origin[0]) / dest[0];
-	}
-	else if (dest[0] == 0) {
-		//Handle edge case of dest = -0
-		/*Eigen::Vector3f invdest = dest.inverse();
-		tmin = (min[0] - origin[0]) / invdest[0];
-		tmax = (max[0] - origin[0]) / invdest[0];*/
-	}
-	else {
-		tmin = (max[0] - origin[0]) / dest[0];
-		tmax = (min[0] - origin[0]) / dest[0];
-	}
-
-	//Set y plane upper and lower bounds
-	if (dest[1] > 0) {
-		tylb = (min[1] - origin[1]) / dest[1];
-		tyub = (max[1] - origin[1]) / dest[1];
-	}
-	else if (dest[1] == 0) {
-		////Handle edge case of dest = -0
-		//Eigen::Vector3f invdest = dest.inverse();
-		//tmin = (min[1] - origin[1]) / invdest[1];
-		//tmax = (max[1] - origin[1]) / invdest[1];
-	}
-	else {
-		tylb = (max[1] - origin[1]) / dest[1];
-		tyub = (min[1] - origin[1]) / dest[1];
-	}
-
-	//If a lower bound t is greater than an upper bound t of another dimension we do not hit the box
-	if ((tmin > tyub) || (tylb > tmax)) return false;
-
-	//test for new highest lower bound and lowest higher bound
-	if (tylb > tmin) tmin = tylb;
-	if (tyub < tmax) tmax = tyub;
-
-
-	//Set z plane upper and lower bounds
-	if (dest[1] > 0) {
-		tzlb = (min[2] - origin[2]) / dest[2];
-		tzub = (max[2] - origin[2]) / dest[2];
-	}
-	else if (dest[2] == 0) {
-		////Handle edge case of dest = -0
-		//Eigen::Vector3f invdest = dest.inverse();
-		//tmin = (min[2] - origin[2]) / invdest[2];
-		//tmax = (max[2] - origin[2]) / invdest[2];
-	}
-	else {
-		tzlb = (max[2] - origin[2]) / dest[2];
-		tzub = (min[2] - origin[2]) / dest[2];
-	}
-
-	if ((tmin > tzub) || (tylb > tzub)) return false;
-
-	//once more for z test for new highest low and lowest high
-	if (tzlb > tmin) tmin = tzlb;
-	if (tzub < tmax) tmax = tzub;
-
-	std::cout << "Lower t: " << tmin << " : " << tylb << " : " << tzlb << std::endl;
-	std::cout << "Upper t: " << tmax << " : " << tyub << " : " << tzub << std::endl;
-
-	return true;
-}
-
-Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
-                                   Eigen::Vector3f &dest) {
+Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin, Eigen::Vector3f &dest) {
+  // ShapeModelMatrix is the modelMatrix which is referred to in literature
   Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
 
   float t, tmin;
@@ -340,45 +247,22 @@ Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
   return (tmin != INFINITY) ? Eigen::Vector3f(1.0, 1.0, 1.0) : Eigen::Vector3f(0.0, 0.0, 0.0);
 }
 
-void Flyscene::drawBoundingBox() {
-	Eigen::Vector3f maxVector = mesh.getBoundingMax();
-	Eigen::Vector3f minVector = mesh.getBoundingMin();
+void Flyscene::generateBoundingBox() {
+	// Get max values of the mesh
+	Eigen::Vector3f maxVector3 = mesh.getBoundingMax();
+	Eigen::Vector3f minVector3 = mesh.getBoundingMin();
 
-	float w = max[0] - min[0];
-	float h = max[1] - min[1];
-	float d = max[2] - min[2];
+	Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
+
+	// Scale to mesh
+	Eigen::Vector4f minVector = modelMatrix * Eigen::Vector4f(minVector3[0], minVector3[1], minVector3[2], 1.0f);
+	Eigen::Vector4f maxVector = modelMatrix * Eigen::Vector4f(maxVector3[0], maxVector3[1], maxVector3[2], 1.0f);
+
+	// Initialize bounding box
+	float w = maxVector[0] - minVector[0];
+	float h = maxVector[1] - minVector[1];
+	float d = maxVector[2] - minVector[2];
 	Tucano::Shapes::Box bBox = Tucano::Shapes::Box(w, h, d);
 	bBox.setColor(Eigen::Vector4f(1, 0, 0, 1));
-
-	Eigen::Affine3f mMatrix = bBox.getModelMatrix();
-	mMatrix.translate(Eigen::Vector3f(1.0, 0, 0));
-	bBox.setModelMatrix(mMatrix);
-	bBox.normalizeModelMatrix();
-
-	Eigen::Affine3f sMatrix = mesh.getShapeModelMatrix();
-	sMatrix = sMatrix.linear();
-	sMatrix = sMatrix.inverse();
-	
-
-	bBox.setModelMatrix(sMatrix);
-
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	bBox.render(flycamera, scene_light);
-	bBox.normalizeModelMatrix();
-
-	//Temp
-	//std::cout << "Scalars: " << w << " : " << h << " : " << d << std::endl;
-
-	Tucano::Shapes::Box testBox = Tucano::Shapes::Box(1, 1, 1);
-	testBox.setColor(Eigen::Vector4f(1, 1, 0, 1));
-
-	mMatrix = testBox.getModelMatrix();
-	mMatrix.translate(Eigen::Vector3f(-1.0, 0, 0));
-	
-	testBox.setModelMatrix(mMatrix);
-	testBox.render(flycamera, scene_light);
-	// end temp
-
-	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
 }
+
