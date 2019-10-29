@@ -365,6 +365,9 @@ __pycache__/
 *.odx.cs
 *.xsd.cs
 
+# Wtf??
+enc_temp_folder
+
 # OpenCover UI analysis results
 OpenCover/
 

@@ -309,6 +309,7 @@ bool Flyscene::isInShadow(float& t, const Eigen::Vector3f p, const Eigen::Vector
 	float m = INFINITY;
 	float bias = 0.05;
 
+	// Check if light is under face
 	if (n.cross((dest - p).normalized()).norm() < 0) return true;
 
 	//loops over all the faces

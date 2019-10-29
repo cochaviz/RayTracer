@@ -82,7 +82,7 @@ public:
    */
   bool triangleIntersect(float &t, const Eigen::Vector3f origin, const Eigen::Vector3f dest, const Eigen::Vector3f v0, const Eigen::Vector3f v1, const Eigen::Vector3f v2);
 
-  Eigen::Vector3f pointShading(const Tucano::Material::Mtl material, const Eigen::Vector3f p, const Eigen::Vector3f n, const Eigen::Vector3f dir, const Eigen::Vector3f light_position);
+  Eigen::Vector3f pointShading(float& t, const Tucano::Material::Mtl material, const Eigen::Vector3f p, Tucano::Face face, const Eigen::Vector3f dir, const Eigen::Vector3f light_position);
   
   	/**
 	* @brief Loops over all the faces and checks whether the ray (cast to the light(s)) intersects with any face
