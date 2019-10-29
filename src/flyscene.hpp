@@ -87,7 +87,7 @@ public:
 
   bool boundingIntersection(Eigen::Vector3f& origin, Eigen::Vector3f& dest);
 
-  bool traceStructure(Eigen::Vector3f &origin, Eigen::Vector3f &dest);
+  bool traceStructure(Eigen::Vector3f &origin, Eigen::Vector3f &dest, Tucano::Mesh bbox);
 private:
 	// A simple phong shader for rendering meshes
 	Tucano::Effects::PhongMaterial phong;

@@ -4,8 +4,6 @@
 #include <limits>
 #include <tucano/shapes/box.hpp>
 
-Tucano::Mesh bbox;
-
 void Flyscene::initialize(int width, int height) {
   // initiliaze the Phong Shading effect for the Opengl Previewer
   phong.initialize();
@@ -16,7 +14,7 @@ void Flyscene::initialize(int width, int height) {
 
   // load the OBJ file and materials
   Tucano::MeshImporter::loadObjFile(mesh, materials,
-                                    "resources/models/cube.obj");
+                                    "resources/models/dodgeColorTest.obj");
 
   // normalize the model (scale to unit cube and center at origin)
   mesh.normalizeModelMatrix();
@@ -39,9 +37,6 @@ void Flyscene::initialize(int width, int height) {
   // craete a first debug ray pointing at the center of the screen
   createDebugRay(Eigen::Vector2f(width / 2.0, height / 2.0));
 
-  // generate bounding box (not rendered)
-	bbox = generateBoundingBox();
-
   glEnable(GL_DEPTH_TEST);
 }
 
@@ -62,7 +57,7 @@ void Flyscene::paintGL(void) {
   ////glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
   // render the scene using OpenGL and one light source
-  phong.render(mesh, flycamera, scene_light);
+  // phong.render(mesh, flycamera, scene_light);
 
   // render the ray and camera representation for ray debug
   ray.render(flycamera, scene_light);
@@ -123,6 +118,10 @@ void Flyscene::createDebugRay(const Eigen::Vector2f &mouse_pos) {
 
 void Flyscene::raytraceScene(int width, int height) {
 
+  // generate bounding box (not rendered)
+	Tucano::Mesh bbox = generateBoundingBox();
+	bbox.render();
+
   // if no width or height passed, use dimensions of current viewport
   Eigen::Vector2i image_size(width, height);
   if (width == 0 || height == 0) {
@@ -151,8 +150,9 @@ void Flyscene::raytraceScene(int width, int height) {
 	for (int i = 0; i < image_size[0]; ++i) {
 		// create a ray from the camera passing through the pixel (i,j)
 		screen_coords = flycamera.screenToWorld(Eigen::Vector2f(i, j));
+	
 		// launch raytracing for the given ray and write result to pixel data
-		pixel_data[i][j] = traceRay(origin, screen_coords);
+		pixel_data[i][j] = (traceStructure(origin, screen_coords, bbox)) ? traceRay(origin, screen_coords) : Eigen::Vector3f(0.0, 0.0, 0.0);
 
 		// Kowalski... Status!
 		std::cout << "[";
@@ -234,9 +234,6 @@ Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
 	// Get modelMatrix for the given mesh
   Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
 
-	if (!traceStructure(origin, dest))
-		return Eigen::Vector3f(85.0/255.0, 191.0/255.0, 225.0/255.0);
- 
 	// Loop over all the faces in the scene
 	for (int i = 0; i<mesh.getNumberOfFaces(); ++i){
 		Tucano::Face face = mesh.getFace(i);    
@@ -265,7 +262,7 @@ Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
 }
 
 bool Flyscene::traceStructure(Eigen::Vector3f &origin,
-                                   Eigen::Vector3f &dest) {
+                                   Eigen::Vector3f &dest, Tucano::Mesh bbox) {
 	float t = INFINITY;
 
 	// Compute ray direction
