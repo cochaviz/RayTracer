@@ -69,6 +69,8 @@ public:
    * @return a RGB color
    */
   Eigen::Vector3f traceRay(Eigen::Vector3f &origin, Eigen::Vector3f &dest);
+  
+  Eigen::Vector3f traceRayRecursive(Eigen::Vector3f &origin, Eigen::Vector3f &dest, int depth);
 
   /**
    * @briefs Check if the current ray intersects the given triangle, and returns the length of the ray (stored in variable t)
@@ -82,7 +84,7 @@ public:
    */
   bool triangleIntersect(float &t, const Eigen::Vector3f origin, const Eigen::Vector3f dest, const Eigen::Vector3f v0, const Eigen::Vector3f v1, const Eigen::Vector3f v2);
 
-  Eigen::Vector3f pointShading(float& t, const Tucano::Material::Mtl material, const Eigen::Vector3f p, Tucano::Face face, const Eigen::Vector3f dir, const Eigen::Vector3f light_position);
+  Eigen::Vector3f pointShading(float& t, const int iterations, const Tucano::Material::Mtl material, const Eigen::Vector3f p, const Eigen::Vector3f n, const Eigen::Vector3f dir, const Eigen::Vector3f light_position);
   
   	/**
 	* @brief Loops over all the faces and checks whether the ray (cast to the light(s)) intersects with any face
@@ -92,7 +94,7 @@ public:
 	* @param face The face containg the point of intersection p
 	* @return whether a point is in shadow
 	*/
-	bool isInShadow(float& t, const Eigen::Vector3f p, const Eigen::Vector3f dest, const Tucano::Face face);
+	bool isInShadow(float& t, const Eigen::Vector3f p, const Eigen::Vector3f dest, const Eigen::Vector3f n);
   
 	Eigen::Vector3f random_unit_vector();
   

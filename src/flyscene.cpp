@@ -209,36 +209,29 @@ Eigen::Vector3f Flyscene::random_unit_vector() {
 	return Eigen::Vector3f(x, s * cos(theta), s * sin(theta));
 }
 
-Eigen::Vector3f Flyscene::pointShading(float& t, const Tucano::Material::Mtl material, const Eigen::Vector3f p, Tucano::Face face, const Eigen::Vector3f dir, const Eigen::Vector3f light_position) {
+Eigen::Vector3f Flyscene::pointShading(float& t, const int iterations, const Tucano::Material::Mtl material, const Eigen::Vector3f p, const Eigen::Vector3f n, const Eigen::Vector3f dir, const Eigen::Vector3f light_position) {
 	float total = 0.0;
-	float iterations = 70.0;
 	float radius = lightrep.getBoundingSphereRadius();
+
 	for (int i = 0; i < iterations; i++) {
-		Eigen::Vector3f randme = random_unit_vector();
-		Eigen::Vector3f rd_light = light_position + (radius * randme);
-		if (!isInShadow(t, p, rd_light, face))total++;
+		Eigen::Vector3f rd_light = light_position + (radius * random_unit_vector());
+		if (!isInShadow(t, p, rd_light, n)) total++;
 	}
 	float coef = total / iterations;
-
-	//Getting the normal from the face
-	Eigen::Vector3f n = face.normal;
-
-	// Normalize normal
-	Eigen::Vector3f normal = n.normalized();
 
 	// Assume all lights have the same intesity, and color
 	Eigen::Vector3f light_value = Eigen::Vector3f(1.0, 1.0, 1.0);
 
 	// Getting all the needed vectors read
 	Eigen::Vector3f light_dir = (light_position - p).normalized();
-	Eigen::Vector3f reflection = 2 * (light_dir.dot(normal)) * normal - light_dir;
 	Eigen::Vector3f eye_dir = -dir;
+	Eigen::Vector3f reflection = 2 * (light_dir.dot(n)) * n - light_dir;
 
 	// Ambient term
 	Eigen::Vector3f ambient = light_value.cwiseProduct(material.getAmbient());
 
 	// Diffuse term
-	float costh = (light_dir).dot(normal);
+	float costh = (light_dir).dot(n);
 	Eigen::Vector3f diffuse = light_value.cwiseProduct(std::max(0.0f, costh) * material.getDiffuse());
 
 	// Specular term
@@ -250,19 +243,20 @@ Eigen::Vector3f Flyscene::pointShading(float& t, const Tucano::Material::Mtl mat
 	// Add it all up
 	Eigen::Vector3f color = coef * (diffuse + specular);//ambient
 	return color;
-
 }
 
-Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f& origin,
-	Eigen::Vector3f& dest) {
+Eigen::Vector3f Flyscene::traceRayRecursive(Eigen::Vector3f& origin,
+	Eigen::Vector3f& dir, int depth) {
+	Eigen::Vector3f bg = Eigen::Vector3f(0.0, 0.0, 0.0);
+		//Eigen::Vector3f(85.0 / 255.0, 191.0 / 255.0, 225.0 / 255.0);
+	if(depth < 0) 
+		return Eigen::Vector3f(0.0, 0.0, 0.0); 
+
 	float t, tmin;
 	t = tmin = INFINITY;
 
 	// Face that's closest to the camera
 	Tucano::Face min_face;
-
-	// Compute ray direction
-	Eigen::Vector3f dir = (dest - origin).normalized();
 
 	// Get modelMatrix for the given mesh
 	Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
@@ -285,44 +279,56 @@ Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f& origin,
 	}
 	// Return the shaded pixel if tmin updated, else return a nice sky color
 	if (tmin != INFINITY) {
-		// Calculate point of intersection
-		Eigen::Vector3f p = origin + tmin * dir;
+		// Calculate point of intersection with bias
+		float bias = 0.2;
+		Eigen::Vector3f n = (min_face.normal).normalized();
+		Eigen::Vector3f p = origin + tmin * dir + bias * n;
+		
 		// TODO Multiple light sources?
-		// for the face that will be displayed test whether it is in shadow and  if true color it black	
-		//if (isInShadow(tmin, p, lights.back(), min_face)) return Eigen::Vector3f(0.0, 0.0, 0.0);
-		//otherewise use pointShading
-		//else 
-		return pointShading(tmin, materials[min_face.material_id], p, min_face, dir, lights.back());
-	}
+	  Eigen::Vector3f reflection = (2 * (dir.dot(n)) * n - dir).normalized();
+		Tucano::Material::Mtl mat = materials[min_face.material_id]; 
 
-	else {
+		// Calculate light from ray reflection
+
+		// Number of iterations for the shadow sampling
+		// Moved from the pointshading function, since ray light has no need for a shadow to be calculated
+		int n_iterations = 70;
+
+		return pointShading(tmin, n_iterations, mat, p, n, dir, lights.back()) + traceRayRecursive(p, reflection, --depth);
+	} else {
 		// Show background color
-		return Eigen::Vector3f(85.0 / 255.0, 191.0 / 255.0, 225.0 / 255.0);
+		return bg;
 	}
+}
+
+Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f& origin,
+	Eigen::Vector3f& dest) {
+	// Compute ray direction
+	Eigen::Vector3f dir = (dest - origin).normalized();
+
+	return traceRayRecursive(origin, dir, 2);
 }
 
 
 
-bool Flyscene::isInShadow(float& t, const Eigen::Vector3f p, const Eigen::Vector3f dest, const Tucano::Face face) {
-	Eigen::Vector3f n = (face.normal).normalized();
+bool Flyscene::isInShadow(float& t, const Eigen::Vector3f p, const Eigen::Vector3f dest, const Eigen::Vector3f n) {
 	Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
 	float m = INFINITY;
-	float bias = 0.05;
 
 	// Check if light is under face
-	if (n.cross((dest - p).normalized()).norm() < 0) return true;
+	// if (n.cross((dest - p).normalized()).norm() < 0) return true;
 
 	//loops over all the faces
 	for (int i = 0; i < mesh.getNumberOfFaces(); ++i) {
-		Tucano::Face face1 = mesh.getFace(i);
+		Tucano::Face face = mesh.getFace(i);
 
 		// Convert mesh coordinates to world coordinates
-		Eigen::Vector3f v11 = (modelMatrix * mesh.getVertex(face1.vertex_ids[0])).head<3>();
-		Eigen::Vector3f v21 = (modelMatrix * mesh.getVertex(face1.vertex_ids[1])).head<3>();
-		Eigen::Vector3f v31 = (modelMatrix * mesh.getVertex(face1.vertex_ids[2])).head<3>();
+		Eigen::Vector3f v1 = (modelMatrix * mesh.getVertex(face.vertex_ids[0])).head<3>();
+		Eigen::Vector3f v2 = (modelMatrix * mesh.getVertex(face.vertex_ids[1])).head<3>();
+		Eigen::Vector3f v3 = (modelMatrix * mesh.getVertex(face.vertex_ids[2])).head<3>();
 
 		// test whether the shadow ray intersects a triangle and whether it is closer
-		if (triangleIntersect(m, p + n * bias, dest, v11, v21, v31) && t > m) {
+		if (triangleIntersect(m, p, dest, v1, v2, v3)) {
 			return true;
 		}
 	}
