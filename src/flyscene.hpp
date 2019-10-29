@@ -83,8 +83,11 @@ public:
 
   Eigen::Vector3f pointShading(const Tucano::Material::Mtl material, const Eigen::Vector3f p, const Eigen::Vector3f n, const Eigen::Vector3f dir, const Eigen::Vector3f light_position);
   
-	void generateBoundingBox();
-	bool boundingIntersection(Eigen::Vector3f& origin, Eigen::Vector3f& dest);
+  Tucano::Mesh generateBoundingBox();
+
+  bool boundingIntersection(Eigen::Vector3f& origin, Eigen::Vector3f& dest);
+
+  bool traceStructure(Eigen::Vector3f &origin, Eigen::Vector3f &dest);
 private:
 	// A simple phong shader for rendering meshes
 	Tucano::Effects::PhongMaterial phong;

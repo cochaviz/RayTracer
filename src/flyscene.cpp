@@ -4,6 +4,8 @@
 #include <limits>
 #include <tucano/shapes/box.hpp>
 
+Tucano::Mesh bbox;
+
 void Flyscene::initialize(int width, int height) {
   // initiliaze the Phong Shading effect for the Opengl Previewer
   phong.initialize();
@@ -37,6 +39,9 @@ void Flyscene::initialize(int width, int height) {
   // craete a first debug ray pointing at the center of the screen
   createDebugRay(Eigen::Vector2f(width / 2.0, height / 2.0));
 
+  // generate bounding box (not rendered)
+	bbox = generateBoundingBox();
+
   glEnable(GL_DEPTH_TEST);
 }
 
@@ -58,9 +63,6 @@ void Flyscene::paintGL(void) {
 
   // render the scene using OpenGL and one light source
   phong.render(mesh, flycamera, scene_light);
-
-  // generate bounding box (not rendered)
-  generateBoundingBox();
 
   // render the ray and camera representation for ray debug
   ray.render(flycamera, scene_light);
@@ -231,6 +233,9 @@ Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
 	
 	// Get modelMatrix for the given mesh
   Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
+
+	if (!traceStructure(origin, dest))
+		return Eigen::Vector3f(85.0/255.0, 191.0/255.0, 225.0/255.0);
  
 	// Loop over all the faces in the scene
 	for (int i = 0; i<mesh.getNumberOfFaces(); ++i){
@@ -254,13 +259,39 @@ Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
 		// TODO Multiple light sources?
 		Eigen::Vector3f p = origin + tmin * dir;
 		return pointShading(materials[min_face.material_id], p, min_face.normal, dir, lights[0]);
-	} else {
-		// Show background color
-		return Eigen::Vector3f(85.0/255.0, 191.0/255.0, 225.0/255.0);
 	}
+	// Show background color
+	return Eigen::Vector3f(85.0/255.0, 191.0/255.0, 225.0/255.0);
 }
 
-void Flyscene::generateBoundingBox() {
+bool Flyscene::traceStructure(Eigen::Vector3f &origin,
+                                   Eigen::Vector3f &dest) {
+	float t = INFINITY;
+
+	// Compute ray direction
+  Eigen::Vector3f dir = (dest - origin).normalized();
+	
+	// Get modelMatrix for the given mesh
+  Eigen::Affine3f modelMatrix = bbox.getShapeModelMatrix();
+
+	// Loop over all the faces in the scene
+	for (int i = 0; i<bbox.getNumberOfFaces(); ++i){
+		Tucano::Face face = bbox.getFace(i);    
+
+		 // Convert mesh coordinates to world coordinates
+     Eigen::Vector3f v1 = (modelMatrix * bbox.getVertex(face.vertex_ids[0])).head<3>();
+     Eigen::Vector3f v2 = (modelMatrix * bbox.getVertex(face.vertex_ids[1])).head<3>();
+     Eigen::Vector3f v3 = (modelMatrix * bbox.getVertex(face.vertex_ids[2])).head<3>();
+
+		 // Update tmin if the ray has an intersection with the given face, and t is smaller than tmin
+     if(triangleIntersect(t, origin, dir, v1, v2, v3)) {
+	     return true;
+		 } 
+  }	
+	return false;
+}
+
+Tucano::Mesh Flyscene::generateBoundingBox() {
 	// Get max values of the mesh
 	Eigen::Vector3f maxVector3 = mesh.getBoundingMax();
 	Eigen::Vector3f minVector3 = mesh.getBoundingMin();
@@ -277,6 +308,6 @@ void Flyscene::generateBoundingBox() {
 	float d = maxVector[2] - minVector[2];
 	
 	// Generate a box using the size parameters 
-	Tucano::Shapes::Box bBox = Tucano::Shapes::Box(w, h, d);
+	return Tucano::Shapes::Box(w, h, d);
 }
 
