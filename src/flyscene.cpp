@@ -1,6 +1,8 @@
 #include "flyscene.hpp"
 #include <cmath>
 #include <GLFW/glfw3.h>
+#include <limits>
+#include <tucano/shapes/box.hpp>
 
 void Flyscene::initialize(int width, int height) {
 	// initiliaze the Phong Shading effect for the Opengl Previewer
@@ -14,9 +16,8 @@ void Flyscene::initialize(int width, int height) {
 	Tucano::MeshImporter::loadObjFile(mesh, materials,
 		"resources/models/soft_test.obj");
 
-
-	// normalize the model (scale to unit cube and center at origin)
-	mesh.normalizeModelMatrix();
+  // normalize the model (scale to unit cube and center at origin)
+  mesh.normalizeModelMatrix();
 
 	// pass all the materials to the Phong Shader
 	for (int i = 0; i < materials.size(); ++i)
@@ -64,12 +65,18 @@ void Flyscene::paintGL(void) {
 	scene_light.resetViewMatrix();
 	scene_light.viewMatrix()->translate(-lights.back());
 
-	// render the scene using OpenGL and one light source
-	phong.render(mesh, flycamera, scene_light);
+  // Render in wireframe mode
+  // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-	// render the ray and camera representation for ray debug
-	ray.render(flycamera, scene_light);
-	camerarep.render(flycamera, scene_light);
+  // render the scene using OpenGL and one light source
+  phong.render(mesh, flycamera, scene_light);
+
+  // generate bounding box (not rendered)
+  generateBoundingBox();
+
+  // render the ray and camera representation for ray debug
+  ray.render(flycamera, scene_light);
+  camerarep.render(flycamera, scene_light);
 
 	// render ray tracing light sources as yellow spheres
 	for (int i = 0; i < lights.size(); ++i) {
@@ -106,8 +113,18 @@ void Flyscene::createDebugRay(const Eigen::Vector2f& mouse_pos) {
 	// from pixel position to world coordinates
 	Eigen::Vector3f screen_pos = flycamera.screenToWorld(mouse_pos);
 
-	// direction from camera center to click position
-	Eigen::Vector3f dir = (screen_pos - flycamera.getCenter()).normalized();
+  // direction from camera center to click position
+  Eigen::Vector3f dir = (screen_pos - flycamera.getCenter()).normalized();
+
+  // set cylinder length to ray colission distance 
+  float rayLength = 10;
+  ray.setSize(0.005, rayLength); 
+
+  // set cylinder length to collision distance
+  traceRay(screen_pos, dir);
+  
+  // position and orient the cylinder representing the ray
+  ray.setOriginOrientation(flycamera.getCenter(), dir);
 
 	// position and orient the cylinder representing the ray
 	ray.setOriginOrientation(flycamera.getCenter(), dir);
@@ -136,24 +153,31 @@ void Flyscene::raytraceScene(int width, int height) {
 	Eigen::Vector3f screen_coords;
 	float progress = image_size[1];
 
+	int barWidth = 45;
+
 	std::cout << "Ray tracing scene..." << std::endl;
 
-	// for every pixel shoot a ray from the origin through the pixel coords
-	for (int j = 0; j < image_size[1]; ++j) {
-		for (int i = 0; i < image_size[0]; ++i) {
-			// create a ray from the camera passing through the pixel (i,j)
-			screen_coords = flycamera.screenToWorld(Eigen::Vector2f(i, j));
-			// launch raytracing for the given ray and write result to pixel data
-			pixel_data[i][j] = traceRay(origin, screen_coords);
-			// Kowalski... Status!
-			std::cout << "Progress: " << (j / progress) * 100 << "%" << std::endl;
+  // for every pixel shoot a ray from the origin through the pixel coords
+  for (int j = 0; j < image_size[1]; ++j) {
+	for (int i = 0; i < image_size[0]; ++i) {
+		// create a ray from the camera passing through the pixel (i,j)
+		screen_coords = flycamera.screenToWorld(Eigen::Vector2f(i, j));
+		// launch raytracing for the given ray and write result to pixel data
+		pixel_data[i][j] = traceRay(origin, screen_coords);
+
+		// Kowalski... Status!
+		std::cout << "[";
+		int pos = barWidth * (j / progress);
+		for (int i = 0; i < barWidth; ++i) {
+			if (i <= pos) std::cout << "#";
+			else std::cout << "-";
 		}
-	}
-
-	std::cout << "Ray tracing done!" << std::endl;
-
-	// write the ray tracing result to a PPM image
-	Tucano::ImageImporter::writePPMImage("result.ppm", pixel_data);
+		std::cout << "] " << int((j/ progress) * 100.0) << " %\r";
+		std::cout.flush();
+    }
+  } 
+  // write the ray tracing result to a PPM image
+  Tucano::ImageImporter::writePPMImage("result.ppm", pixel_data);
 }
 
 bool Flyscene::triangleIntersect(float& t, const Eigen::Vector3f origin, const Eigen::Vector3f dir, const Eigen::Vector3f v0, const Eigen::Vector3f v1, const Eigen::Vector3f v2) {
@@ -198,6 +222,7 @@ Eigen::Vector3f Flyscene::pointShading(float& t, const Tucano::Material::Mtl mat
 
 	//Getting the normal from the face
 	Eigen::Vector3f n = face.normal;
+
 	// Normalize normal
 	Eigen::Vector3f normal = n.normalized();
 
@@ -302,3 +327,24 @@ bool Flyscene::isInShadow(float& t, const Eigen::Vector3f p, const Eigen::Vector
 	}
 	return false;
 }
+
+void Flyscene::generateBoundingBox() {
+	// Get max values of the mesh
+	Eigen::Vector3f maxVector3 = mesh.getBoundingMax();
+	Eigen::Vector3f minVector3 = mesh.getBoundingMin();
+
+	Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
+
+	// Scale to mesh
+	Eigen::Vector4f minVector = modelMatrix * Eigen::Vector4f(minVector3[0], minVector3[1], minVector3[2], 1.0f);
+	Eigen::Vector4f maxVector = modelMatrix * Eigen::Vector4f(maxVector3[0], maxVector3[1], maxVector3[2], 1.0f);
+
+	// Initialize bounding box width, height, depth
+	float w = maxVector[0] - minVector[0];
+	float h = maxVector[1] - minVector[1];
+	float d = maxVector[2] - minVector[2];
+	
+	// Generate a box using the size parameters 
+	Tucano::Shapes::Box bBox = Tucano::Shapes::Box(w, h, d);
+}
+

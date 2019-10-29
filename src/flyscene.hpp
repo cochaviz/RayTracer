@@ -19,73 +19,73 @@
 class Flyscene {
 
 public:
-	Flyscene(void) {}
 
-	/**
-	 * @brief Initializes the shader effect
-	 * @param width Window width in pixels
-	 * @param height Window height in pixels
-	 */
-	void initialize(int width, int height);
+  Flyscene(void) {}
 
-	/**
-	 * Repaints screen buffer.
-	 **/
-	virtual void paintGL();
+  /**
+   * @brief Initializes the shader effect
+   * @param width Window width in pixels
+   * @param height Window height in pixels
+   */
+  void initialize(int width, int height);
 
-	/**
-	 * Perform a single simulation step.
-	 **/
-	virtual void simulate(GLFWwindow* window);
+  /**
+   * Repaints screen buffer.
+   **/
+  virtual void paintGL();
 
-	/**
-	 * Returns the pointer to the flycamera instance
-	 * @return pointer to flycamera
-	 **/
-	Tucano::Flycamera* getCamera(void) { return &flycamera; }
+  /**
+   * Perform a single simulation step.
+   **/
+  virtual void simulate(GLFWwindow *window);
 
-	/**
-	 * @brief Add a new light source
-	 */
-	void addLight(void) { lights.push_back(flycamera.getCenter()); }
+  /**
+   * Returns the pointer to the flycamera instance
+   * @return pointer to flycamera
+   **/
+  Tucano::Flycamera *getCamera(void) { return &flycamera; }
 
-	/**
-	 * @brief Create a debug ray at the current camera location and passing
-	 * through pixel that mouse is over
-	 * @param mouse_pos Mouse cursor position in pixels
-	 */
-	void createDebugRay(const Eigen::Vector2f& mouse_pos);
+  /**
+   * @brief Add a new light source
+   */
+  void addLight(void) { lights.push_back(flycamera.getCenter()); }
 
-	/**
-	 * @brief raytrace your scene from current camera position
-	 */
-	void raytraceScene(int width = 0, int height = 0);
+  /**
+   * @brief Create a debug ray at the current camera location and passing
+   * through pixel that mouse is over
+   * @param mouse_pos Mouse cursor position in pixels
+   */
+  void createDebugRay(const Eigen::Vector2f &mouse_pos);
 
-	/**
-	 * @brief trace a single ray from the camera passing through dest
-	 * @param origin Ray origin
-	 * @param dest Other point on the ray, usually screen coordinates
-	 * @return a RGB color
-	 */
-	Eigen::Vector3f traceRay(Eigen::Vector3f& origin, Eigen::Vector3f& dest);
+  /**
+   * @brief raytrace your scene from current camera position   
+   */
+  void raytraceScene(int width = 0, int height = 0);
 
-	/**
-	 * @briefs Check if the current ray intersects the given triangle, and returns the length of the ray (stored in variable t)
-	 * @param the length of the ray (valid if function returns true)
-	 * @param origin Ray origin
-	 * @param dest Other point on the ray, usually screen coordinates
-	 * @param v0 first vector of the triangle
-	 * @param v1 second vector of the triangle
-	 * @param v2 third vector of the triangle
-	 * @return boolean check; whether or not the ray intersects with the triangle; validity of t
-	 */
-	bool triangleIntersect(float& t, const Eigen::Vector3f origin, const Eigen::Vector3f dest, const Eigen::Vector3f v0, const Eigen::Vector3f v1, const Eigen::Vector3f v2);
-	//return pointShading(tmin, materials[min_face.material_id], p, min_face, dir, lights.back());
-	Eigen::Vector3f pointShading(float& t, const Tucano::Material::Mtl material, const Eigen::Vector3f p, Tucano::Face face, const Eigen::Vector3f dir, const Eigen::Vector3f light_position);
+  /**
+   * @brief trace a single ray from the camera passing through dest
+   * @param origin Ray origin
+   * @param dest Other point on the ray, usually screen coordinates
+   * @return a RGB color
+   */
+  Eigen::Vector3f traceRay(Eigen::Vector3f &origin, Eigen::Vector3f &dest);
 
-	/**
-	* @brief Loops over all the faces and check whether the ray from the intersection point of the closest face(p) to the light source(dest) intersects any of them.
-	*			If so color it black, otherwise use pointShading.
+  /**
+   * @briefs Check if the current ray intersects the given triangle, and returns the length of the ray (stored in variable t)
+   * @param the length of the ray (valid if function returns true)
+   * @param origin Ray origin
+   * @param dest Other point on the ray, usually screen coordinates
+   * @param v0 first vector of the triangle
+   * @param v1 second vector of the triangle
+   * @param v2 third vector of the triangle
+   * @return boolean check; whether or not the ray intersects with the triangle; validity of t
+   */
+  bool triangleIntersect(float &t, const Eigen::Vector3f origin, const Eigen::Vector3f dest, const Eigen::Vector3f v0, const Eigen::Vector3f v1, const Eigen::Vector3f v2);
+
+  Eigen::Vector3f pointShading(const Tucano::Material::Mtl material, const Eigen::Vector3f p, const Eigen::Vector3f n, const Eigen::Vector3f dir, const Eigen::Vector3f light_position);
+  
+  	/**
+	* @brief Loops over all the faces and checks whether the ray (cast to the light(s)) intersects with any face
 	* @param t the length of the ray (valid if function returns true)
 	* @param p Ray origin - the closest intersection point from traceRay
 	* @param dest The location of the light source
@@ -93,7 +93,11 @@ public:
 	* @return whether a point is in shadow
 	*/
 	bool isInShadow(float& t, const Eigen::Vector3f p, const Eigen::Vector3f dest, const Tucano::Face face);
+  
 	Eigen::Vector3f random_unit_vector();
+  
+	void generateBoundingBox();
+
 private:
 	// A simple phong shader for rendering meshes
 	Tucano::Effects::PhongMaterial phong;
