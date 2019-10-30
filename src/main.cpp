@@ -7,8 +7,8 @@
 #include <atomic>
 #include <ctime>
 
-#define WINDOW_WIDTH 100	
-#define WINDOW_HEIGHT 100
+#define WINDOW_WIDTH 200	
+#define WINDOW_HEIGHT 200
 
 Flyscene* flyscene;
 Eigen::Vector2f mouse_pos = Eigen::Vector2f::Zero();
