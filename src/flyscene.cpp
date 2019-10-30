@@ -3,6 +3,8 @@
 #include <GLFW/glfw3.h>
 #include <limits>
 #include <tucano/shapes/box.hpp>
+#include <thread>
+#include <pthread.h>
 
 void Flyscene::initialize(int width, int height) {
 	// initiliaze the Phong Shading effect for the Opengl Previewer
@@ -16,8 +18,8 @@ void Flyscene::initialize(int width, int height) {
 	Tucano::MeshImporter::loadObjFile(mesh, materials,
 		"resources/models/soft_test.obj");
 
-  // normalize the model (scale to unit cube and center at origin)
-  mesh.normalizeModelMatrix();
+  	// normalize the model (scale to unit cube and center at origin)
+  	mesh.normalizeModelMatrix();
 
 	// pass all the materials to the Phong Shader
 	for (int i = 0; i < materials.size(); ++i)
@@ -134,7 +136,7 @@ void Flyscene::createDebugRay(const Eigen::Vector2f& mouse_pos) {
 	camerarep.setModelMatrix(flycamera.getViewMatrix().inverse());
 }
 
-void Flyscene::raytraceScene(int width, int height) {
+void Flyscene::raytraceScene(int width, int height, int n_threads) {
 
 	// if no width or height passed, use dimensions of current viewport
 	Eigen::Vector2i image_size(width, height);
@@ -148,14 +150,35 @@ void Flyscene::raytraceScene(int width, int height) {
 	for (int i = 0; i < image_size[1]; ++i)
 		pixel_data[i].resize(image_size[0]);
 
-	// origin of the ray is always the camera center
-	Eigen::Vector3f origin = flycamera.getCenter();
-	Eigen::Vector3f screen_coords;
-	float progress = image_size[1];
-
-	int barWidth = 45;
+	// make thread vector
+	vector<std::thread> threads; 
 
 	std::cout << "Ray tracing scene..." << std::endl;
+	
+	// Take a picture
+//	std::thread t([this, &pixel_data, n_threads, image_size] // capture the this pointer and y by value
+//	{
+//	    this->takeAPicture(pixel_data, n_threads, image_size);
+//	});
+	// pthread_t 
+	
+	thread *t = new thread([&]{
+		takeAPicture(pixel_data, 1, image_size);
+	});
+	t->join();
+	
+  	// write the ray tracing result to a PPM image
+  	Tucano::ImageImporter::writePPMImage("result.ppm", pixel_data);
+}
+
+void Flyscene::takeAPicture(vector<vector<Eigen::Vector3f>> &pixel_data, const int number_of_threads, const Eigen::Vector2i image_size) { 
+
+  // origin of the ray is always the camera center
+  Eigen::Vector3f origin = flycamera.getCenter();
+  Eigen::Vector3f screen_coords;
+  
+  float progress = image_size[1];
+  int barWidth = 45;
 
   // for every pixel shoot a ray from the origin through the pixel coords
   for (int j = 0; j < image_size[1]; ++j) {
@@ -164,20 +187,18 @@ void Flyscene::raytraceScene(int width, int height) {
 		screen_coords = flycamera.screenToWorld(Eigen::Vector2f(i, j));
 		// launch raytracing for the given ray and write result to pixel data
 		pixel_data[i][j] = traceRay(origin, screen_coords);
-
 		// Kowalski... Status!
 		std::cout << "[";
 		int pos = barWidth * (j / progress);
+
 		for (int i = 0; i < barWidth; ++i) {
 			if (i <= pos) std::cout << "#";
 			else std::cout << "-";
 		}
 		std::cout << "] " << int((j/ progress) * 100.0) << " %\r";
 		std::cout.flush();
-    }
+    	}
   } 
-  // write the ray tracing result to a PPM image
-  Tucano::ImageImporter::writePPMImage("result.ppm", pixel_data);
 }
 
 bool Flyscene::triangleIntersect(float& t, const Eigen::Vector3f origin, const Eigen::Vector3f dir, const Eigen::Vector3f v0, const Eigen::Vector3f v1, const Eigen::Vector3f v2) {
@@ -284,8 +305,7 @@ Eigen::Vector3f Flyscene::traceRayRecursive(Eigen::Vector3f& origin,
 		Eigen::Vector3f n = (min_face.normal).normalized();
 		Eigen::Vector3f p = origin + tmin * dir + bias * n;
 		
-		// TODO Multiple light sources?
-	  Eigen::Vector3f reflection = (2 * (dir.dot(n)) * n - dir).normalized();
+	  	Eigen::Vector3f reflection = (2 * (dir.dot(n)) * n - dir).normalized();
 		Tucano::Material::Mtl mat = materials[min_face.material_id]; 
 
 		// Calculate light from ray reflection
@@ -327,7 +347,7 @@ bool Flyscene::isInShadow(float& t, const Eigen::Vector3f p, const Eigen::Vector
 		Eigen::Vector3f v2 = (modelMatrix * mesh.getVertex(face.vertex_ids[1])).head<3>();
 		Eigen::Vector3f v3 = (modelMatrix * mesh.getVertex(face.vertex_ids[2])).head<3>();
 
-		// test whether the shadow ray intersects a triangle and whether it is closer
+		// test whether the shadow ray intersects a triangle
 		if (triangleIntersect(m, p, dest, v1, v2, v3)) {
 			return true;
 		}

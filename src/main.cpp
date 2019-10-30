@@ -6,12 +6,15 @@
 #include <iostream>
 #include <atomic>
 #include <ctime>
+#include <thread>
+#include <pthread.h>
 
 #define WINDOW_WIDTH 100	
 #define WINDOW_HEIGHT 100
 
 Flyscene *flyscene;
 Eigen::Vector2f mouse_pos = Eigen::Vector2f::Zero();
+int n_threads = 1;
 
 #ifdef TUCANODEBUG
 void GLAPIENTRY
@@ -31,7 +34,7 @@ MessageCallback(GLenum source,
 }
 #endif
 
-void initialize(void) {
+void initialize() {
   Tucano::Misc::initGlew();
 
 #ifdef TUCANODEBUG
@@ -44,8 +47,7 @@ void initialize(void) {
 
   std::cout << endl
             << endl
-            << " ************ usage ************** " << std::endl;
-  std::cout << "R    : Reset camera." << std::endl;
+            << " ************ usage ************** " << std::endl; std::cout << "R    : Reset camera." << std::endl;
   std::cout << "WASD : Move camera in xz plane." << std::endl;
   std::cout << "QEZC : Move camera along y axis." << std::endl;
   std::cout << "SPACE: Shoot debug ray from mouse cursor position." << std::endl;
@@ -69,7 +71,7 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action,
   else if (key == GLFW_KEY_T && action == GLFW_PRESS) {
 	  std::cout << "Raytrace start. Time start. Engage.." << std::endl;
 	  clock_t timeStart = clock();
-	  flyscene->raytraceScene();
+	  flyscene->raytraceScene(n_threads);
 	  clock_t timeEnd = clock();
 
 	  printf("\nRender time     : %04.2f (sec)\n", (float)(timeEnd - timeStart) / CLOCKS_PER_SEC);
@@ -97,6 +99,9 @@ static void cursorPosCallback(GLFWwindow *window, double xpos, double ypos) {
 int main(int argc, char *argv[]) {
   GLFWwindow *main_window;
 
+  if(argc > 1) {
+	  n_threads = strtol(argv[1], nullptr, 0);
+  }
   if (!glfwInit()) {
     std::cerr << "Failed to init glfw" << std::endl;
     return 1;

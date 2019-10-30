@@ -5,6 +5,7 @@
 #include <GL/glew.h>
 
 #include <GLFW/glfw3.h>
+#include <thread>
 
 #include <tucano/effects/phongmaterialshader.hpp>
 #include <tucano/mesh.hpp>
@@ -27,7 +28,7 @@ public:
    * @param width Window width in pixels
    * @param height Window height in pixels
    */
-  void initialize(int width, int height);
+  void initialize(int width, int heightm);
 
   /**
    * Repaints screen buffer.
@@ -60,7 +61,7 @@ public:
   /**
    * @brief raytrace your scene from current camera position   
    */
-  void raytraceScene(int width = 0, int height = 0);
+  void raytraceScene(int width = 0, int height = 0, int n_threads=1);
 
   /**
    * @brief trace a single ray from the camera passing through dest
@@ -100,6 +101,8 @@ public:
   
 	void generateBoundingBox();
 
+	void takeAPicture(vector<vector<Eigen::Vector3f>> &pixel_data, const int number_of_threads, const Eigen::Vector2i image_size);
+	
 private:
 	// A simple phong shader for rendering meshes
 	Tucano::Effects::PhongMaterial phong;
