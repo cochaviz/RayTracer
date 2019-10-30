@@ -68,6 +68,7 @@ public:
 	 * @param dest Other point on the ray, usually screen coordinates
 	 * @return a RGB color
 	 */
+	Eigen::Vector3f traceRay(Eigen::Vector3f& origin, Eigen::Vector3f& dest, vector<Tucano::Face> faces);
 	Eigen::Vector3f traceRay(Eigen::Vector3f& origin, Eigen::Vector3f& dest);
 
 	/**
@@ -91,11 +92,12 @@ public:
 	bool boundingIntersection(Eigen::Vector3f& origin, Eigen::Vector3f& dest);
 
 
-	bool traceStructure(Eigen::Vector3f& origin, Eigen::Vector3f& dest, Tucano::Mesh bbox);
+	Eigen::Vector3f traceStructure(Eigen::Vector3f& origin, Eigen::Vector3f& dest, Tucano::Mesh bbox);
 
 	Eigen::Vector3f traceFace(Eigen::Vector3f& origin, Eigen::Vector3f& dest, Tucano::Face face);
 
-	bool traceInnerBBox(Eigen::Vector3f& origin, Eigen::Vector3f& dest, Tucano::Shapes::Box bbox);
+	bool traceInnerBBox(Eigen::Vector3f& origin, Eigen::Vector3f& dest, Tucano::Shapes::Box& bbox);
+	bool sortDist(Tucano::Shapes::Box&, Tucano::Shapes::Box&);
 
 	std::vector<Tucano::Shapes::Box> splitBox(Tucano::Shapes::Box box);
 private:

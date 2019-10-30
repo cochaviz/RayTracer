@@ -103,6 +103,8 @@ public:
 
 	vector<Eigen::Vector4f> vertices;
 	std::vector<Tucano::Face> containedFaces;
+	float camDistance;
+
 	/**
 	* @brief Default Constructor
 	*/

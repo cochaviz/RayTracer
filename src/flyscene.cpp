@@ -3,6 +3,7 @@
 #include <GLFW/glfw3.h>
 #include <limits>
 #include <tucano/shapes/box.hpp>
+#include <algorithm>
 
 void Flyscene::initialize(int width, int height) {
 	// initiliaze the Phong Shading effect for the Opengl Previewer
@@ -14,7 +15,7 @@ void Flyscene::initialize(int width, int height) {
 
 	// load the OBJ file and materials
 	Tucano::MeshImporter::loadObjFile(mesh, materials,
-		"resources/models/cube.obj");
+		"resources/models/dodgeColorTest.obj");
 
 	// normalize the model (scale to unit cube and center at origin)
 	mesh.normalizeModelMatrix();
@@ -180,29 +181,7 @@ void Flyscene::raytraceScene(int width, int height) {
 
 			// launch raytracing for the given ray and write result to pixel data
 			//pixel_data[i][j] = (traceStructure(origin, screen_coords, bbox)) ? traceRay(origin, screen_coords) : Eigen::Vector3f(0.0, 0.0, 0.0);
-
-			traceStructure(origin, screen_coords, bbox);
-
-			/*
-			TRACERAY!
-			if(traceStructure)
-				restofcode()
-			else
-				return
-			ENDTRACERAY!
-			TRACESTRUCTURE!
-			Outer bbox:
-			If coordinates within ray
-				For each boundingboxes[]
-					if coordinates within ray
-						for each vertex
-							traceRay()
-			Recursively test for intersection for all boxes inside this box
-			if(triangleIntersect) {
-				if(!boxesInsideThisOne()) {
-					foreach (vertice) {
-			*/
-
+			pixel_data[i][j] = traceStructure(origin, screen_coords, bbox);
 
 			// Kowalski... Status!
 			std::cout << "[";
@@ -271,6 +250,47 @@ Eigen::Vector3f Flyscene::pointShading(const Tucano::Material::Mtl material, con
 }
 
 Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f& origin,
+	Eigen::Vector3f& dest, vector<Tucano::Face> faces) {
+	float t, tmin;
+	t = tmin = INFINITY;
+
+	// Face that's closest to the camera
+	Tucano::Face min_face;
+
+	// Compute ray direction
+	Eigen::Vector3f dir = (dest - origin).normalized();
+
+	// Get modelMatrix for the given mesh
+	Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
+
+	// Loop over all the faces in the scene
+	for (auto f : faces) {
+		Tucano::Face face = f;
+
+		// Convert mesh coordinates to world coordinates
+		Eigen::Vector3f v1 = (modelMatrix * mesh.getVertex(face.vertex_ids[0])).head<3>();
+		Eigen::Vector3f v2 = (modelMatrix * mesh.getVertex(face.vertex_ids[1])).head<3>();
+		Eigen::Vector3f v3 = (modelMatrix * mesh.getVertex(face.vertex_ids[2])).head<3>();
+
+		// Update tmin if the ray has an intersection with the given face, and t is smaller than tmin
+		// or: if we found a face closer the ray
+		if (triangleIntersect(t, origin, dir, v1, v2, v3) && t < tmin) {
+			tmin = t;
+			min_face = face;
+		}
+	}
+	// Return the shaded pixel if tmin updated, else return a nice sky color
+	if (tmin != INFINITY) {
+		// Calculate point of intersection
+		// TODO Multiple light sources?
+		Eigen::Vector3f p = origin + tmin * dir;
+		return pointShading(materials[min_face.material_id], p, min_face.normal, dir, lights[0]);
+	}
+	// Show background color
+	return Eigen::Vector3f(85.0 / 255.0, 191.0 / 255.0, 225.0 / 255.0);
+}
+
+Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f& origin,
 	Eigen::Vector3f& dest) {
 	float t, tmin;
 	t = tmin = INFINITY;
@@ -285,7 +305,7 @@ Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f& origin,
 	Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
 
 	// Loop over all the faces in the scene
-	for (int i = 0; i < mesh.getNumberOfFaces(); ++i) {
+	for (int i = 0; i < mesh.getNumberOfFaces(); i++) {
 		Tucano::Face face = mesh.getFace(i);
 
 		// Convert mesh coordinates to world coordinates
@@ -311,7 +331,7 @@ Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f& origin,
 	return Eigen::Vector3f(85.0 / 255.0, 191.0 / 255.0, 225.0 / 255.0);
 }
 
-bool Flyscene::traceStructure(Eigen::Vector3f& origin,
+Eigen::Vector3f Flyscene::traceStructure(Eigen::Vector3f& origin,
 	Eigen::Vector3f& dest, Tucano::Mesh bbox) {
 	float t = INFINITY;
 
@@ -347,23 +367,23 @@ bool Flyscene::traceStructure(Eigen::Vector3f& origin,
 		}
 	}
 
+	//Sort hitboxes by camDistance
+	//std::sort(bboxes.begin(), bboxes.end(), sortDist);
+
 	//Append all the hit boxes vertices to a big list
 	for (auto b : hitBoxes) {
 		relevantFaces.insert(relevantFaces.end(), b.containedFaces.begin(), b.containedFaces.end());
 	}
 
 	//For each vertex trace a ray and see if the ray hits. If it doesn't set the color to skybox.
-	for (auto f : relevantFaces) {
-		traceFace(origin, dest, f);
-	}
-
-	//HOW TO RETURN TRUE? SHOULD THIS JUST BE VOID NOW?
-	return false;
+	return traceRay(origin, dest, relevantFaces);
 }
+
+//bool Flyscene::sortDist(Tucano::Shapes::Box &i, Tucano::Shapes::Box &j) { return i.camDistance < j.camDistance; }
 
 
 bool Flyscene::traceInnerBBox(Eigen::Vector3f& origin,
-	Eigen::Vector3f& dest, Tucano::Shapes::Box bbox) {
+	Eigen::Vector3f& dest, Tucano::Shapes::Box& bbox) {
 
 	float t = INFINITY;
 
@@ -384,6 +404,7 @@ bool Flyscene::traceInnerBBox(Eigen::Vector3f& origin,
 
 		// Update tmin if the ray has an intersection with the given face, and t is smaller than tmin
 		if (triangleIntersect(t, origin, dir, v1, v2, v3)) {
+			bbox.camDistance = t;
 			return true;
 		}
 	}
@@ -455,21 +476,21 @@ vector<Tucano::Shapes::Box> Flyscene::splitBox(Tucano::Shapes::Box outerBox) {
 	// Get max values of the mesh
 	Eigen::Vector3f maxVector = outerBox.getBoundingMax();
 	Eigen::Vector3f minVector = outerBox.getBoundingMin();
-	int cellAmmount = 3;
+	int cellCountBase = 16;
 
 	std::vector<Tucano::Shapes::Box> boxes;
 
-	float w = (maxVector[0] - minVector[0]) / cellAmmount;
+	float w = (maxVector[0] - minVector[0]) / cellCountBase;
 	std::cout <<"x"<< (maxVector[0] - minVector[0]) << std::endl;
 	std::cout << "y"<<(maxVector[1] - minVector[1]) << std::endl;
-	float h = (maxVector[1] - minVector[1]) / cellAmmount;
-	float d = (maxVector[2] - minVector[2]) / cellAmmount;
+	float h = (maxVector[1] - minVector[1]) / cellCountBase;
+	float d = (maxVector[2] - minVector[2]) / cellCountBase;
 
 
 	//Tucano::Shapes::Box box = Tucano::Shapes::Box(w, h, d);
-	for (int i = 0; i < cellAmmount; i++) {
-		for (int j = 0; j < cellAmmount; j++) {
-			for (int z = 0; z < cellAmmount; z++) {
+	for (int i = 0; i < cellCountBase; i++) {
+		for (int j = 0; j < cellCountBase; j++) {
+			for (int z = 0; z < cellCountBase; z++) {
 				// Initialize bounding box width, height, depth
 				Tucano::Shapes::Box box1 = Tucano::Shapes::Box(w, h, d);
 				float w1 = (i-1) * w;
