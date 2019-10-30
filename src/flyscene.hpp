@@ -86,6 +86,7 @@ public:
 
 	Tucano::Shapes::Box generateBoundingBox();
 	Tucano::Shapes::Box bbox;
+	vector <Tucano::Shapes::Box> boxVec;
 
 	bool boundingIntersection(Eigen::Vector3f& origin, Eigen::Vector3f& dest);
 
