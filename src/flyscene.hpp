@@ -1,6 +1,7 @@
 #ifndef __FLYSCENE__
 #define __FLYSCENE__
 
+
 // Must be included before glfw.
 #include <GL/glew.h>
 
@@ -89,6 +90,8 @@ public:
 
   bool boundingIntersection(Eigen::Vector3f& origin, Eigen::Vector3f& dest);
   
+  vector<Tucano::Shapes::Box> bboxes;
+  void generateBoundingBoxes(Tucano::Shapes::Box outerBox);
 
   bool traceStructure(Eigen::Vector3f& origin, Eigen::Vector3f& dest, Tucano::Mesh bbox);
 

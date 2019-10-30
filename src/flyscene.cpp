@@ -58,22 +58,22 @@ void Flyscene::paintGL(void) {
   glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
   Tucano::Shapes::Box bbox = generateBoundingBox();
-
+/*
   Eigen::Vector3f meshMinVec = mesh.getBoundingMin();
   Eigen::Vector3f meshMaxVec = mesh.getBoundingMax();
   Eigen::Vector3f bboxMinVec = bbox.getBoundingMin();
   Eigen::Vector3f bboxMaxVec = bbox.getBoundingMax();
   Eigen::Affine3f mMatrix = bbox.getShapeModelMatrix();
-  Eigen::Vector3f translateVec = (meshMaxVec - meshMinVec) / 10;
-  Eigen::Vector3f testVec = Eigen::Vector3f(-0.005, -0.37, 0.05);
-  mMatrix.translate(translateVec);
+  Eigen::Vector3f translateVec = (meshMaxVec - meshMinVec) / 10;*/
+  //Eigen::Vector3f testVec = Eigen::Vector3f(-0.005, -0.37, 0.05);
+  //mMatrix.translate(translateVec);*/
 
-  bbox.setModelMatrix(mMatrix);
-  std::cout << "MESH min: " << meshMinVec.transpose() << std::endl;
-  std::cout << "MESH max: " << meshMaxVec.transpose() << std::endl;
+  ////bbox.setModelMatrix(mMatrix);
+  //std::cout << "MESH min: " << meshMinVec.transpose() << std::endl;
+  //std::cout << "MESH max: " << meshMaxVec.transpose() << std::endl;
   std::cout << "BBOX min: " << bbox.getBoundingMin().transpose().normalized() << std::endl;
-  std::cout << "BBOX max: " << bbox.getBoundingMax().transpose() << std::endl;
-  std::cout << "Translate: " << translateVec.transpose() << std::endl;
+  std::cout << "BBOX max: " << bbox.getBoundingMax().transpose() << std::endl;/*
+  std::cout << "Translate: " << translateVec.transpose() << std::endl;*/
   bbox.normalizeModelMatrix();
 
   bbox.render(flycamera,scene_light);
