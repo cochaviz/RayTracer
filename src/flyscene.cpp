@@ -15,7 +15,7 @@ void Flyscene::initialize(int width, int height) {
 
 	// load the OBJ file and materials
 	Tucano::MeshImporter::loadObjFile(mesh, materials,
-		"resources/models/dodgeColorTest.obj");
+		"resources/models/cube.obj");
 
 	// normalize the model (scale to unit cube and center at origin)
 	mesh.normalizeModelMatrix();
@@ -476,7 +476,7 @@ vector<Tucano::Shapes::Box> Flyscene::splitBox(Tucano::Shapes::Box outerBox) {
 	// Get max values of the mesh
 	Eigen::Vector3f maxVector = outerBox.getBoundingMax();
 	Eigen::Vector3f minVector = outerBox.getBoundingMin();
-	int cellCountBase = 5;
+	int cellCountBase = 2;
 
 	std::vector<Tucano::Shapes::Box> boxes;
 
@@ -513,7 +513,7 @@ vector<Tucano::Shapes::Box> Flyscene::splitBox(Tucano::Shapes::Box outerBox) {
 		Tucano::Face f = mesh.getFace(i);
 		Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
 
-		for (auto b : boxes) {
+		/*for (auto b : boxes) {
 
 
 			Eigen::Vector3f v1 = (modelMatrix * mesh.getVertex(f.vertex_ids[0])).head<3>();
@@ -539,44 +539,46 @@ vector<Tucano::Shapes::Box> Flyscene::splitBox(Tucano::Shapes::Box outerBox) {
 				break;
 			}
 
-		}
+		}*/
 		
 
-		////Initialize min and max vectors
-		//Eigen::Vector3f min = Eigen::Vector3f(INFINITY, INFINITY, INFINITY);
-		//Eigen::Vector3f max = Eigen::Vector3f(-INFINITY, -INFINITY, -INFINITY);
+		//Initialize min and max vectors
+		Eigen::Vector3f min = Eigen::Vector3f(INFINITY, INFINITY, INFINITY);
+		Eigen::Vector3f max = Eigen::Vector3f(-INFINITY, -INFINITY, -INFINITY);
 
-		//Eigen::Vector3f v1 = (modelMatrix * mesh.getVertex(f.vertex_ids[0])).head<3>();
-		//Eigen::Vector3f min = v1;
+		Eigen::Vector3f v1 = (modelMatrix * mesh.getVertex(f.vertex_ids[0])).head<3>();
+		min = v1;
 
-		//Eigen::Vector3f v2 = (modelMatrix * mesh.getVertex(f.vertex_ids[1])).head<3>();
-		//Eigen::Vector3f v3 = (modelMatrix * mesh.getVertex(f.vertex_ids[2])).head<3>();
+		Eigen::Vector3f v2 = (modelMatrix * mesh.getVertex(f.vertex_ids[1])).head<3>();
+		Eigen::Vector3f v3 = (modelMatrix * mesh.getVertex(f.vertex_ids[2])).head<3>();
 
-		////Set min and max of bounding box of face
-		//if (v2[0] < min[0]) min[0] = v2[0];
-		//if (v3[0] < min[0]) min[0] = v3[0];
-		//		  
-		//if (v2[1] < min[1]) min[1] = v2[1];
-		//if (v3[1] < min[1]) min[1] = v3[1];
-		//		  
-		//if (v2[2] < min[2]) min[2] = v2[2];
-		//if (v3[2] < min[2]) min[2] = v3[2];
+		//Set min and max of bounding box of face
+		if (v2[0] < min[0]) min[0] = v2[0];
+		if (v3[0] < min[0]) min[0] = v3[0];
+				  
+		if (v2[1] < min[1]) min[1] = v2[1];
+		if (v3[1] < min[1]) min[1] = v3[1];
+				  
+		if (v2[2] < min[2]) min[2] = v2[2];
+		if (v3[2] < min[2]) min[2] = v3[2];
 
-		//if (v2[0] > max[0]) max[0] = v2[0];
-		//if (v3[0] > min[0]) max[0] = v3[0];
+		if (v2[0] > max[0]) max[0] = v2[0];
+		if (v3[0] > min[0]) max[0] = v3[0];
 
-		//if (v2[1] > max[1]) max[1] = v2[1];
-		//if (v3[1] > max[1]) max[1] = v3[1];
+		if (v2[1] > max[1]) max[1] = v2[1];
+		if (v3[1] > max[1]) max[1] = v3[1];
 
-		//if (v2[2] > max[2]) max[2] = v2[2];
-		//if (v3[2] > max[2]) max[2] = v3[2];
+		if (v2[2] > max[2]) max[2] = v2[2];
+		if (v3[2] > max[2]) max[2] = v3[2];
 
-		////Loop over boxes testing if the face belongs inside it
-		//for (auto b : boxes) {
-		//	if (min >= b.boundingMin) {
-		//		b.containedFaces.push_back(f);
-		//	}
-		//}
+		//Loop over boxes testing if the face belongs inside it
+		for (auto b : boxes) {
+			if (min[0] < b.boundingMax[0] && min[0] > b.boundingMin[0] &&
+				min[1] < b.boundingMax[1] && min[1] > b.boundingMin[1] &&
+				min[2] < b.boundingMax[2] && min[2] > b.boundingMin[2]) {
+				b.containedFaces.push_back(f);
+			}
+		}
 	}
 	return boxes;
 }
