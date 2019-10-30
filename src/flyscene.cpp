@@ -4,7 +4,6 @@
 #include <limits>
 #include <tucano/shapes/box.hpp>
 #include <thread>
-#include <pthread.h>
 
 void Flyscene::initialize(int width, int height) {
 	// initiliaze the Phong Shading effect for the Opengl Previewer
@@ -151,28 +150,28 @@ void Flyscene::raytraceScene(int width, int height, int n_threads) {
 		pixel_data[i].resize(image_size[0]);
 
 	// make thread vector
-	vector<std::thread> threads; 
+	vector<std::thread*> threads; 
 
 	std::cout << "Ray tracing scene..." << std::endl;
-	
-	// Take a picture
-//	std::thread t([this, &pixel_data, n_threads, image_size] // capture the this pointer and y by value
-//	{
-//	    this->takeAPicture(pixel_data, n_threads, image_size);
-//	});
-	// pthread_t 
-	
-	thread *t = new thread([&]{
-		takeAPicture(pixel_data, 1, image_size);
-	});
-	t->join();
-	
+
+	for(int i=0; i<n_threads; ++i) {
+		threads.push_back(
+			new thread([&]{
+			takeAPicture(pixel_data, n_threads, i, image_size);
+				})
+		);
+	}
+	for(int i=0; i<n_threads; ++i)
+		threads[i]->join();
+
   	// write the ray tracing result to a PPM image
   	Tucano::ImageImporter::writePPMImage("result.ppm", pixel_data);
 }
 
-void Flyscene::takeAPicture(vector<vector<Eigen::Vector3f>> &pixel_data, const int number_of_threads, const Eigen::Vector2i image_size) { 
+void Flyscene::takeAPicture(vector<vector<Eigen::Vector3f>> &pixel_data, const int n_threads, const int thread_number, const Eigen::Vector2i image_size) {
 
+	int n_rows = std::ceil((thread_number / n_threads) * image_size[1]);
+  
   // origin of the ray is always the camera center
   Eigen::Vector3f origin = flycamera.getCenter();
   Eigen::Vector3f screen_coords;
@@ -181,7 +180,7 @@ void Flyscene::takeAPicture(vector<vector<Eigen::Vector3f>> &pixel_data, const i
   int barWidth = 45;
 
   // for every pixel shoot a ray from the origin through the pixel coords
-  for (int j = 0; j < image_size[1]; ++j) {
+  for (int j = n_rows * thread_number; (j < (n_rows + 1) * thread_number) && (j < image_size[1]); ++j) {
 	for (int i = 0; i < image_size[0]; ++i) {
 		// create a ray from the camera passing through the pixel (i,j)
 		screen_coords = flycamera.screenToWorld(Eigen::Vector2f(i, j));

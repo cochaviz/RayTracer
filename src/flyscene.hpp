@@ -101,7 +101,7 @@ public:
   
 	void generateBoundingBox();
 
-	void takeAPicture(vector<vector<Eigen::Vector3f>> &pixel_data, const int number_of_threads, const Eigen::Vector2i image_size);
+	void takeAPicture(vector<vector<Eigen::Vector3f>> &pixel_data, const int number_of_threads, const int thread_number, const Eigen::Vector2i image_size);
 	
 private:
 	// A simple phong shader for rendering meshes
