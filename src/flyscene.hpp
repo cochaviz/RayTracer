@@ -15,6 +15,7 @@
 #include <tucano/utils/imageIO.hpp>
 #include <tucano/utils/mtlIO.hpp>
 #include <tucano/utils/objimporter.hpp>
+#include <tucano/shapes/box.hpp>
 
 class Flyscene {
 
@@ -82,12 +83,19 @@ public:
   bool triangleIntersect(float &t, const Eigen::Vector3f origin, const Eigen::Vector3f dest, const Eigen::Vector3f v0, const Eigen::Vector3f v1, const Eigen::Vector3f v2);
 
   Eigen::Vector3f pointShading(const Tucano::Material::Mtl material, const Eigen::Vector3f p, const Eigen::Vector3f n, const Eigen::Vector3f dir, const Eigen::Vector3f light_position);
-  
-  Tucano::Mesh generateBoundingBox();
+
+  Tucano::Shapes::Box generateBoundingBox();
+  Tucano::Shapes::Box bbox;
 
   bool boundingIntersection(Eigen::Vector3f& origin, Eigen::Vector3f& dest);
+  
 
-  bool traceStructure(Eigen::Vector3f &origin, Eigen::Vector3f &dest, Tucano::Mesh bbox);
+  bool traceStructure(Eigen::Vector3f& origin, Eigen::Vector3f& dest, Tucano::Mesh bbox);
+
+  Eigen::Vector3f traceFace(Eigen::Vector3f& origin, Eigen::Vector3f& dest, Tucano::Face face);
+
+  bool traceInnerBBox(Eigen::Vector3f& origin, Eigen::Vector3f& dest, Tucano::Shapes::Box bbox);
+
 private:
 	// A simple phong shader for rendering meshes
 	Tucano::Effects::PhongMaterial phong;

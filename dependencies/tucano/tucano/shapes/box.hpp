@@ -102,6 +102,7 @@ private:
 public:
 
 	vector<Eigen::Vector4f> vertices;
+	std::vector<Tucano::Face> containedFaces;
 	/**
 	* @brief Default Constructor
 	*/

@@ -37,6 +37,7 @@ void Flyscene::initialize(int width, int height) {
   // craete a first debug ray pointing at the center of the screen
   createDebugRay(Eigen::Vector2f(width / 2.0, height / 2.0));
 
+
   glEnable(GL_DEPTH_TEST);
 }
 
@@ -54,10 +55,32 @@ void Flyscene::paintGL(void) {
   scene_light.resetViewMatrix();
   scene_light.viewMatrix()->translate(-lights.back());
 
-  ////glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+  glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+  Tucano::Shapes::Box bbox = generateBoundingBox();
+
+  Eigen::Vector3f meshMinVec = mesh.getBoundingMin();
+  Eigen::Vector3f meshMaxVec = mesh.getBoundingMax();
+  Eigen::Vector3f bboxMinVec = bbox.getBoundingMin();
+  Eigen::Vector3f bboxMaxVec = bbox.getBoundingMax();
+  Eigen::Affine3f mMatrix = bbox.getShapeModelMatrix();
+  Eigen::Vector3f translateVec = (meshMaxVec - meshMinVec) / 10;
+  Eigen::Vector3f testVec = Eigen::Vector3f(-0.005, -0.37, 0.05);
+  mMatrix.translate(translateVec);
+
+  bbox.setModelMatrix(mMatrix);
+  std::cout << "MESH min: " << meshMinVec.transpose() << std::endl;
+  std::cout << "MESH max: " << meshMaxVec.transpose() << std::endl;
+  std::cout << "BBOX min: " << bbox.getBoundingMin().transpose().normalized() << std::endl;
+  std::cout << "BBOX max: " << bbox.getBoundingMax().transpose() << std::endl;
+  std::cout << "Translate: " << translateVec.transpose() << std::endl;
+  bbox.normalizeModelMatrix();
+
+  bbox.render(flycamera,scene_light);
+  glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
   // render the scene using OpenGL and one light source
-  // phong.render(mesh, flycamera, scene_light);
+  phong.render(mesh, flycamera, scene_light);
 
   // render the ray and camera representation for ray debug
   ray.render(flycamera, scene_light);
@@ -119,8 +142,6 @@ void Flyscene::createDebugRay(const Eigen::Vector2f &mouse_pos) {
 void Flyscene::raytraceScene(int width, int height) {
 
   // generate bounding box (not rendered)
-	Tucano::Mesh bbox = generateBoundingBox();
-	bbox.render();
 
   // if no width or height passed, use dimensions of current viewport
   Eigen::Vector2i image_size(width, height);
@@ -152,7 +173,35 @@ void Flyscene::raytraceScene(int width, int height) {
 		screen_coords = flycamera.screenToWorld(Eigen::Vector2f(i, j));
 	
 		// launch raytracing for the given ray and write result to pixel data
-		pixel_data[i][j] = (traceStructure(origin, screen_coords, bbox)) ? traceRay(origin, screen_coords) : Eigen::Vector3f(0.0, 0.0, 0.0);
+		//pixel_data[i][j] = (traceStructure(origin, screen_coords, bbox)) ? traceRay(origin, screen_coords) : Eigen::Vector3f(0.0, 0.0, 0.0);
+
+		traceStructure(origin, screen_coords, bbox);
+
+		/*
+		TRACERAY!
+		if(traceStructure)
+			restofcode()
+		else
+			return
+		ENDTRACERAY!
+
+		TRACESTRUCTURE!
+		Outer bbox:
+		If coordinates within ray
+			For each boundingboxes[]
+				if coordinates within ray
+					for each vertex
+						traceRay()
+
+		Recursively test for intersection for all boxes inside this box
+
+		if(triangleIntersect) {
+			if(!boxesInsideThisOne()) {
+				foreach (vertice) {
+
+
+		*/
+		
 
 		// Kowalski... Status!
 		std::cout << "[";
@@ -229,10 +278,10 @@ Eigen::Vector3f Flyscene::traceRay(Eigen::Vector3f &origin,
 	Tucano::Face min_face;
  
 	// Compute ray direction
-  Eigen::Vector3f dir = (dest - origin).normalized();
+	Eigen::Vector3f dir = (dest - origin).normalized();
 	
 	// Get modelMatrix for the given mesh
-  Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
+	Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
 
 	// Loop over all the faces in the scene
 	for (int i = 0; i<mesh.getNumberOfFaces(); ++i){
@@ -265,30 +314,122 @@ bool Flyscene::traceStructure(Eigen::Vector3f &origin,
                                    Eigen::Vector3f &dest, Tucano::Mesh bbox) {
 	float t = INFINITY;
 
+	std::vector<Tucano::Shapes::Box> bboxes = {};
+	std::vector<Tucano::Shapes::Box> hitBoxes = {};
+	std::vector<Tucano::Face> relevantFaces = {};
+
 	// Compute ray direction
-  Eigen::Vector3f dir = (dest - origin).normalized();
+	Eigen::Vector3f dir = (dest - origin).normalized();
 	
 	// Get modelMatrix for the given mesh
-  Eigen::Affine3f modelMatrix = bbox.getShapeModelMatrix();
+	Eigen::Affine3f modelMatrix = bbox.getShapeModelMatrix();
 
-	// Loop over all the faces in the scene
+	// Loop over all the faces in the outer bounding box
 	for (int i = 0; i<bbox.getNumberOfFaces(); ++i){
 		Tucano::Face face = bbox.getFace(i);    
 
-		 // Convert mesh coordinates to world coordinates
-     Eigen::Vector3f v1 = (modelMatrix * bbox.getVertex(face.vertex_ids[0])).head<3>();
-     Eigen::Vector3f v2 = (modelMatrix * bbox.getVertex(face.vertex_ids[1])).head<3>();
-     Eigen::Vector3f v3 = (modelMatrix * bbox.getVertex(face.vertex_ids[2])).head<3>();
+		// Convert bbox coordinates to world coordinates
+		Eigen::Vector3f v1 = (modelMatrix * bbox.getVertex(face.vertex_ids[0])).head<3>();
+		Eigen::Vector3f v2 = (modelMatrix * bbox.getVertex(face.vertex_ids[1])).head<3>();
+		Eigen::Vector3f v3 = (modelMatrix * bbox.getVertex(face.vertex_ids[2])).head<3>();
 
-		 // Update tmin if the ray has an intersection with the given face, and t is smaller than tmin
-     if(triangleIntersect(t, origin, dir, v1, v2, v3)) {
-	     return true;
-		 } 
-  }	
+		// Test for ray intersection with the box, if it hits add all the inner boxes it hits to a list.
+		if(triangleIntersect(t, origin, dir, v1, v2, v3)) {
+			//Add all the bounding boxes hit to a list
+			for (auto b : bboxes) {
+				if (traceInnerBBox(origin, dest, b)) {
+					hitBoxes.push_back(b);
+				}
+			}
+			
+			//SHOULD WE BREAK THE LOOP NOW?
+		} 
+	}	
+
+	//Append all the hit boxes vertices to a big list
+	for (auto b : hitBoxes) {
+		relevantFaces.insert(relevantFaces.end(), b.containedFaces.begin(), b.containedFaces.end());
+	}
+
+	//For each vertex trace a ray and see if the ray hits. If it doesn't set the color to skybox.
+	for (auto f : relevantFaces) {
+		traceFace(origin, dest, f);
+	}
+
+	//HOW TO RETURN TRUE? SHOULD THIS JUST BE VOID NOW?
 	return false;
 }
 
-Tucano::Mesh Flyscene::generateBoundingBox() {
+
+bool Flyscene::traceInnerBBox(Eigen::Vector3f& origin,
+	Eigen::Vector3f& dest, Tucano::Shapes::Box bbox) {
+
+	float t = INFINITY;
+
+	// Compute ray direction
+	Eigen::Vector3f dir = (dest - origin).normalized();
+
+	// Get modelMatrix for the given mesh
+	Eigen::Affine3f modelMatrix = bbox.getShapeModelMatrix();
+
+	// Loop over all the faces in the scene
+	for (int i = 0; i < bbox.getNumberOfFaces(); ++i) {
+		Tucano::Face face = bbox.getFace(i);
+
+		// Convert mesh coordinates to world coordinates
+		Eigen::Vector3f v1 = (modelMatrix * bbox.getVertex(face.vertex_ids[0])).head<3>();
+		Eigen::Vector3f v2 = (modelMatrix * bbox.getVertex(face.vertex_ids[1])).head<3>();
+		Eigen::Vector3f v3 = (modelMatrix * bbox.getVertex(face.vertex_ids[2])).head<3>();
+
+		// Update tmin if the ray has an intersection with the given face, and t is smaller than tmin
+		if (triangleIntersect(t, origin, dir, v1, v2, v3)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+
+
+Eigen::Vector3f Flyscene::traceFace(Eigen::Vector3f& origin,
+	Eigen::Vector3f& dest, Tucano::Face face) {
+	float t, tmin;
+	t = tmin = INFINITY;
+
+	// Face that's closest to the camera
+	Tucano::Face min_face;
+
+	// Compute ray direction
+	Eigen::Vector3f dir = (dest - origin).normalized();
+
+	// Get modelMatrix for the given mesh
+	Eigen::Affine3f modelMatrix = mesh.getShapeModelMatrix();
+
+
+	// Convert mesh coordinates to world coordinates
+	Eigen::Vector3f v1 = (modelMatrix * mesh.getVertex(face.vertex_ids[0])).head<3>();
+	Eigen::Vector3f v2 = (modelMatrix * mesh.getVertex(face.vertex_ids[1])).head<3>();
+	Eigen::Vector3f v3 = (modelMatrix * mesh.getVertex(face.vertex_ids[2])).head<3>();
+
+	// Update tmin if the ray has an intersection with the given face, and t is smaller than tmin
+	// or: if we found a face closer the ray
+	if (triangleIntersect(t, origin, dir, v1, v2, v3) && t < tmin) {
+		tmin = t;
+		min_face = face;
+	}
+
+	// Return the shaded pixel if tmin updated, else return a nice sky color
+	if (tmin != INFINITY) {
+		// Calculate point of intersection
+		// TODO Multiple light sources?
+		Eigen::Vector3f p = origin + tmin * dir;
+		return pointShading(materials[min_face.material_id], p, min_face.normal, dir, lights[0]);
+	}
+	// Show background color
+	return Eigen::Vector3f(85.0 / 255.0, 191.0 / 255.0, 225.0 / 255.0);
+}
+
+Tucano::Shapes::Box Flyscene::generateBoundingBox() {
 	// Get max values of the mesh
 	Eigen::Vector3f maxVector3 = mesh.getBoundingMax();
 	Eigen::Vector3f minVector3 = mesh.getBoundingMin();
@@ -298,6 +439,7 @@ Tucano::Mesh Flyscene::generateBoundingBox() {
 	// Scale to mesh
 	Eigen::Vector4f minVector = modelMatrix * Eigen::Vector4f(minVector3[0], minVector3[1], minVector3[2], 1.0f);
 	Eigen::Vector4f maxVector = modelMatrix * Eigen::Vector4f(maxVector3[0], maxVector3[1], maxVector3[2], 1.0f);
+
 
 	// Initialize bounding box width, height, depth
 	float w = maxVector[0] - minVector[0];
