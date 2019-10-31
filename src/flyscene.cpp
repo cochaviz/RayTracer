@@ -20,13 +20,19 @@ void Flyscene::initialize(int width, int height) {
 	Tucano::MeshImporter::loadObjFile(mesh, materials,
 		"resources/models/soft_test.obj");
 
-  // normalize the model (scale to unit cube and center at origin)
-  mesh.normalizeModelMatrix();
+	// normalize the model (scale to unit cube and center at origin)
+	mesh.normalizeModelMatrix();
 
 	// pass all the materials to the Phong Shader
 	for (int i = 0; i < materials.size(); ++i)
 		phong.addMaterial(materials[i]);
 
+	//number of point of the light source, which we take into account
+	n_lightPoints = 100.0;
+	//create vector containing n_lightPoints points on the surface of the sphere
+	for (int i = 0; i < n_lightPoints; i++) {
+		lightPoints.push_back(random_unit_vector());
+	}
 	// set the color and size of the sphere to represent the light sources
 	// same sphere is used for all sources
 	lightrep.setColor(Eigen::Vector4f(1.0, 1.0, 0.0, 1.0));
@@ -69,18 +75,18 @@ void Flyscene::paintGL(void) {
 	scene_light.resetViewMatrix();
 	scene_light.viewMatrix()->translate(-lights.back());
 
-  // Render in wireframe mode
-  // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	// Render in wireframe mode
+	// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-  // render the scene using OpenGL and one light source
-  phong.render(mesh, flycamera, scene_light);
+	// render the scene using OpenGL and one light source
+	phong.render(mesh, flycamera, scene_light);
 
-  // generate bounding box (not rendered)
-  generateBoundingBox();
+	// generate bounding box (not rendered)
+	generateBoundingBox();
 
-  // render the ray and camera representation for ray debug
-  ray.render(flycamera, scene_light);
-  camerarep.render(flycamera, scene_light);
+	// render the ray and camera representation for ray debug
+	ray.render(flycamera, scene_light);
+	camerarep.render(flycamera, scene_light);
 
 	// render ray tracing light sources as yellow spheres
 	for (int i = 0; i < lights.size(); ++i) {
@@ -117,18 +123,18 @@ void Flyscene::createDebugRay(const Eigen::Vector2f& mouse_pos) {
 	// from pixel position to world coordinates
 	Eigen::Vector3f screen_pos = flycamera.screenToWorld(mouse_pos);
 
-  // direction from camera center to click position
-  Eigen::Vector3f dir = (screen_pos - flycamera.getCenter()).normalized();
+	// direction from camera center to click position
+	Eigen::Vector3f dir = (screen_pos - flycamera.getCenter()).normalized();
 
-  // set cylinder length to ray colission distance 
-  float rayLength = 10;
-  ray.setSize(0.005, rayLength); 
+	// set cylinder length to ray colission distance 
+	float rayLength = 10;
+	ray.setSize(0.005, rayLength);
 
-  // set cylinder length to collision distance
-  traceRay(screen_pos, dir);
-  
-  // position and orient the cylinder representing the ray
-  ray.setOriginOrientation(flycamera.getCenter(), dir);
+	// set cylinder length to collision distance
+	traceRay(screen_pos, dir);
+
+	// position and orient the cylinder representing the ray
+	ray.setOriginOrientation(flycamera.getCenter(), dir);
 
 	// position and orient the cylinder representing the ray
 	ray.setOriginOrientation(flycamera.getCenter(), dir);
@@ -222,16 +228,16 @@ void Flyscene::takeAPicture(vector<vector<Eigen::Vector3f>>& pixel_data, const i
 			screen_coords = flycamera.screenToWorld(Eigen::Vector2f(i, j));
 			// launch raytracing for the given ray and write result to pixel data
 			pixel_data[i][j] = traceRay(origin, screen_coords);
-			
-			
-			
+
+
+
 			// Kowalski... Status!
 
 			//clear screen
 			printf("%c[2J", ESC);
 
 			//clear line
-			printf("%c^ [[2K", ESC); 
+			printf("%c^ [[2K", ESC);
 
 			printf("UULULUULL");
 
@@ -277,19 +283,23 @@ bool Flyscene::triangleIntersect(float& t, const Eigen::Vector3f origin, const E
 }
 
 Eigen::Vector3f Flyscene::random_unit_vector() {
-	float theta = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / 2.0 * M_PI));
-	float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / 2.0)); -1.0;
-	float s = static_cast <float>(sqrt(1.0 - x * x));
-	return Eigen::Vector3f(x, s * cos(theta), s * sin(theta));
+	//gets 3 random numbers between 0 and 1, set them as coorinates and normalizes
+	float	x = static_cast <float>((double)rand() / (RAND_MAX));
+	float	y = static_cast <float>((double)rand() / (RAND_MAX));
+	float	z = static_cast <float>((double)rand() / (RAND_MAX));
+	Eigen::Vector3f me = Eigen::Vector3f(x, y, z);
+	return me.normalized();
 }
 
 Eigen::Vector3f Flyscene::pointShading(float& t, const Tucano::Material::Mtl material, const Eigen::Vector3f p, Tucano::Face face, const Eigen::Vector3f dir, const Eigen::Vector3f light_position) {
 	float total = 0.0;
-	float iterations = 70.0;
+	//to change the number of iterations you need to change the n_lightPoints variable, located in initialize
+	float iterations = n_lightPoints;
 	float radius = lightrep.getBoundingSphereRadius();
+	//count how many of the predefined number of points on the lightSource are visible 
 	for (int i = 0; i < iterations; i++) {
-		Eigen::Vector3f randme = random_unit_vector();
-		Eigen::Vector3f rd_light = light_position + (radius * randme);
+		//Eigen::Vector3f randme = random_unit_vector();
+		Eigen::Vector3f rd_light = light_position + (radius * lightPoints[i]);
 		if (!isInShadow(t, p, rd_light, face))total++;
 	}
 	float coef = total / iterations;
@@ -402,7 +412,6 @@ bool Flyscene::isInShadow(float& t, const Eigen::Vector3f p, const Eigen::Vector
 	}
 	return false;
 }
-
 void Flyscene::generateBoundingBox() {
 	// Get max values of the mesh
 	Eigen::Vector3f maxVector3 = mesh.getBoundingMax();
@@ -418,8 +427,7 @@ void Flyscene::generateBoundingBox() {
 	float w = maxVector[0] - minVector[0];
 	float h = maxVector[1] - minVector[1];
 	float d = maxVector[2] - minVector[2];
-	
+
 	// Generate a box using the size parameters 
 	Tucano::Shapes::Box bBox = Tucano::Shapes::Box(w, h, d);
 }
-
