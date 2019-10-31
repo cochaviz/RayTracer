@@ -3,6 +3,10 @@
 #include <GLFW/glfw3.h>
 #include <limits>
 #include <tucano/shapes/box.hpp>
+#include <thread>
+
+#define ESC 27
+
 
 void Flyscene::initialize(int width, int height) {
 	// initiliaze the Phong Shading effect for the Opengl Previewer
@@ -148,36 +152,106 @@ void Flyscene::raytraceScene(int width, int height) {
 	for (int i = 0; i < image_size[1]; ++i)
 		pixel_data[i].resize(image_size[0]);
 
-	// origin of the ray is always the camera center
-	Eigen::Vector3f origin = flycamera.getCenter();
-	Eigen::Vector3f screen_coords;
-	float progress = image_size[1];
-
-	int barWidth = 45;
+	// make thread vector
+	vector<std::thread*> threads;
 
 	std::cout << "Ray tracing scene..." << std::endl;
 
-  // for every pixel shoot a ray from the origin through the pixel coords
-  for (int j = 0; j < image_size[1]; ++j) {
-	for (int i = 0; i < image_size[0]; ++i) {
-		// create a ray from the camera passing through the pixel (i,j)
-		screen_coords = flycamera.screenToWorld(Eigen::Vector2f(i, j));
-		// launch raytracing for the given ray and write result to pixel data
-		pixel_data[i][j] = traceRay(origin, screen_coords);
+	////create threads
+	//for (int i = 0; i <= n_threads; ++i) {
+	//	threads.emplace_back(new thread([&] { takeAPicture(pixel_data, n_threads, i, image_size); }));
+	//}
 
-		// Kowalski... Status!
-		std::cout << "[";
-		int pos = barWidth * (j / progress);
-		for (int i = 0; i < barWidth; ++i) {
-			if (i <= pos) std::cout << "#";
-			else std::cout << "-";
+	//for (auto& th : threads)
+	//	th->join();
+
+	//wait for them to complete
+	//for (std::thread* th : threads)
+
+
+	thread* t0 = new thread([&] { takeAPicture(pixel_data, 12, 0, image_size); });
+	thread* t1 = new thread([&] { takeAPicture(pixel_data, 12, 1, image_size); });
+	thread* t2 = new thread([&] { takeAPicture(pixel_data, 12, 2, image_size); });
+	thread* t3 = new thread([&] { takeAPicture(pixel_data, 12, 3, image_size); });
+	thread* t4 = new thread([&] { takeAPicture(pixel_data, 12, 4, image_size); });
+	thread* t5 = new thread([&] { takeAPicture(pixel_data, 12, 5, image_size); });
+	thread* t6 = new thread([&] { takeAPicture(pixel_data, 12, 6, image_size); });
+	thread* t7 = new thread([&] { takeAPicture(pixel_data, 12, 7, image_size); });
+	thread* t8 = new thread([&] { takeAPicture(pixel_data, 12, 8, image_size); });
+	thread* t9 = new thread([&] { takeAPicture(pixel_data, 12, 9, image_size); });
+	thread* t10 = new thread([&] { takeAPicture(pixel_data, 12, 10, image_size); });
+	thread* t11 = new thread([&] { takeAPicture(pixel_data, 12, 11, image_size); });
+
+	t0->join();
+	t1->join();
+	t2->join();
+	t3->join();
+	t4->join();
+	t5->join();
+	t6->join();
+	t7->join();
+	t8->join();
+	t9->join();
+	t10->join();
+	t11->join();
+
+	// write the ray tracing result to a PPM image
+	Tucano::ImageImporter::writePPMImage("result.ppm", pixel_data);
+}
+
+void Flyscene::takeAPicture(vector<vector<Eigen::Vector3f>>& pixel_data, const int n_threads, const int thread_number, const Eigen::Vector2i image_size) {
+
+	int n_rows = std::ceil((float)image_size[1] / (float)n_threads);
+
+	// origin of the ray is always the camera center
+	Eigen::Vector3f origin = flycamera.getCenter();
+	Eigen::Vector3f screen_coords;
+
+	float progress = n_rows;
+	int barWidth = 45;
+
+	int i = 0;
+	int j = 0;
+	std::cout << n_rows << std::endl;
+	clock_t timeStart = clock();
+
+	// for every pixel shoot a ray from the origin through the pixel coords
+	for (j = (n_rows * thread_number); (j < (n_rows * (thread_number + 1))) && (j < image_size[1]); ++j) {
+		for (i = 0; i < image_size[0]; ++i) {
+			// create a ray from the camera passing through the pixel (i,j)
+			screen_coords = flycamera.screenToWorld(Eigen::Vector2f(i, j));
+			// launch raytracing for the given ray and write result to pixel data
+			pixel_data[i][j] = traceRay(origin, screen_coords);
+			
+			
+			
+			// Kowalski... Status!
+
+			//clear screen
+			printf("%c[2J", ESC);
+
+			//clear line
+			printf("%c^ [[2K", ESC); 
+
+			printf("UULULUULL");
+
+			//Move cursor 1 up
+			printf("%c[{1}A", ESC);
+
+			std::cout << "[";
+			int pos = barWidth * (j / progress);
+
+			for (int i = 0; i < barWidth; ++i) {
+				if (i <= pos) std::cout << "#";
+				else std::cout << "-";
+			}
+			std::cout << "] " << int(((j - n_rows * thread_number) / progress) * 100.0) << " %\r";
+			std::cout.flush();
 		}
-		std::cout << "] " << int((j/ progress) * 100.0) << " %\r";
-		std::cout.flush();
-    }
-  } 
-  // write the ray tracing result to a PPM image
-  Tucano::ImageImporter::writePPMImage("result.ppm", pixel_data);
+	}
+	clock_t timeEnd = clock();
+	printf("j max = %d, i max = %d for thread %d", j, i, thread_number);
+	printf("\nRender time thread %d:  %04.2f (sec)\n", thread_number, (float)(timeEnd - timeStart) / CLOCKS_PER_SEC);
 }
 
 bool Flyscene::triangleIntersect(float& t, const Eigen::Vector3f origin, const Eigen::Vector3f dir, const Eigen::Vector3f v0, const Eigen::Vector3f v1, const Eigen::Vector3f v2) {

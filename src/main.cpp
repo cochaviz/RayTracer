@@ -7,8 +7,10 @@
 #include <atomic>
 #include <ctime>
 
-#define WINDOW_WIDTH 100	
-#define WINDOW_HEIGHT 100
+#define WINDOW_WIDTH 150	
+#define WINDOW_HEIGHT 150
+#define ESC 27
+
 
 Flyscene *flyscene;
 Eigen::Vector2f mouse_pos = Eigen::Vector2f::Zero();
@@ -54,6 +56,17 @@ void initialize(void) {
   std::cout << "T    : Ray trace the scene." << std::endl;
   std::cout << "Esc  : Close application." << std::endl;
   std::cout << " ********************************* " << std::endl;
+
+  //clear screen
+  printf("%c[2J", ESC);
+
+  //clear line
+  printf("%c^ [[2K", ESC);
+
+  printf("UULULUULL");
+
+  //Move cursor 1 up
+  printf("%c[{1}A", ESC);
 }
 
 void keyCallback(GLFWwindow *window, int key, int scancode, int action,

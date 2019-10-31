@@ -98,6 +98,8 @@ public:
   
 	void generateBoundingBox();
 
+	void takeAPicture(vector<vector<Eigen::Vector3f>>& pixel_data, const int n_threads, const int thread_number, const Eigen::Vector2i image_size);
+
 private:
 	// A simple phong shader for rendering meshes
 	Tucano::Effects::PhongMaterial phong;
